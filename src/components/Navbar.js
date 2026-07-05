@@ -1,6 +1,7 @@
 'use client'
 import { useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { useRouter, usePathname } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import {
@@ -40,7 +41,7 @@ export default function Navbar({ namaGuru, namaKelas }) {
           <Menu size={20} />
         </button>
         <div className="flex-1 min-w-0">
-          <p className="text-xs text-navy-300 leading-none">SDN Pasirkaliki 1</p>
+          <p className="text-xs text-navy-300 leading-none">SDN Pasirkaliki I</p>
           <p className="text-sm font-semibold truncate leading-snug">{namaKelas || 'Sistem Informasi Kelas'}</p>
         </div>
         <div className="text-right hidden sm:block">
@@ -51,23 +52,30 @@ export default function Navbar({ namaGuru, namaKelas }) {
 
       {/* Overlay */}
       {open && (
-        <div
-          className="fixed inset-0 bg-black/50 z-40"
-          onClick={() => setOpen(false)}
-        />
+        <div className="fixed inset-0 bg-black/50 z-40" onClick={() => setOpen(false)} />
       )}
 
       {/* Sidebar drawer */}
       <aside className={`fixed top-0 left-0 h-full w-72 bg-navy-900 z-50 transform transition-transform duration-200 ease-in-out flex flex-col
         ${open ? 'translate-x-0' : '-translate-x-full'}`}
       >
-        {/* Sidebar header */}
-        <div className="bg-navy-800 px-4 py-4 flex items-center justify-between border-b border-navy-700">
-          <div>
-            <p className="text-gold-400 text-xs font-semibold tracking-widest uppercase">Sistem Informasi</p>
-            <p className="text-white font-bold text-base">SDN Pasirkaliki 1</p>
+        {/* Sidebar header dengan logo */}
+        <div className="bg-navy-800 px-4 py-4 flex items-center gap-3 border-b border-navy-700">
+          <div className="w-12 h-12 relative flex-shrink-0">
+            <Image
+              src="/logo-sdn.png"
+              alt="Logo SDN Pasirkaliki 1"
+              width={48}
+              height={48}
+              className="object-contain"
+            />
           </div>
-          <button onClick={() => setOpen(false)} className="text-navy-400 hover:text-white p-1">
+          <div className="flex-1 min-w-0">
+            <p className="text-gold-400 text-xs font-semibold leading-none">Sistem Informasi Kelas</p>
+            <p className="text-white font-bold text-sm leading-snug">SDN Pasirkaliki I</p>
+            <p className="text-navy-400 text-xs leading-tight">Kec. Rawamerta, Karawang</p>
+          </div>
+          <button onClick={() => setOpen(false)} className="text-navy-400 hover:text-white p-1 flex-shrink-0">
             <X size={20} />
           </button>
         </div>
