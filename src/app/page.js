@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -23,7 +24,6 @@ export default function LoginPage() {
       return
     }
 
-    // Ambil role pengguna
     const { data: profile } = await supabase
       .from('profiles')
       .select('role')
@@ -41,21 +41,30 @@ export default function LoginPage() {
     <div className="min-h-screen bg-navy-800 flex flex-col">
       {/* Header sekolah */}
       <div className="bg-navy-900 py-6 px-4 text-center border-b border-navy-700">
-        <div className="flex items-center justify-center gap-3 mb-2">
-          {/* Emblem placeholder */}
-          <div className="w-14 h-14 bg-gold-400 rounded-full flex items-center justify-center">
-            <span className="text-navy-900 font-bold text-xl">S</span>
+        <div className="flex items-center justify-center gap-4 mb-2">
+          <div className="w-20 h-20 relative flex-shrink-0">
+            <Image
+              src="/logo-sdn.png"
+              alt="Logo SDN Pasirkaliki 1"
+              width={80}
+              height={80}
+              className="object-contain"
+            />
           </div>
           <div className="text-left">
             <p className="text-gold-400 text-xs font-semibold tracking-widest uppercase">Sistem Informasi Kelas</p>
-            <h1 className="text-white text-lg font-bold leading-tight">SDN Pasirkaliki 1</h1>
-            <p className="text-navy-300 text-xs">Kota Bandung</p>
+            <h1 className="text-white text-xl font-bold leading-tight">SDN Pasirkaliki I</h1>
+            <p className="text-navy-300 text-xs leading-relaxed mt-0.5">
+              Dusun Sempur Rt 11 Rw 03<br />
+              Desa Pasirkaliki, Kec. Rawamerta<br />
+              Kabupaten Karawang
+            </p>
           </div>
         </div>
       </div>
 
       {/* Form login */}
-      <div className="flex-1 flex items-start justify-center pt-12 px-4">
+      <div className="flex-1 flex items-start justify-center pt-10 px-4">
         <div className="w-full max-w-sm">
           <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
             <div className="bg-navy-700 px-6 py-4">
@@ -108,7 +117,7 @@ export default function LoginPage() {
 
       {/* Footer */}
       <div className="text-center py-4 text-navy-500 text-xs">
-        © {new Date().getFullYear()} SDN Pasirkaliki 1 · Sistem Informasi Kelas
+        © {new Date().getFullYear()} SDN Pasirkaliki I · Korwilcambidik Kec. Rawamerta
       </div>
     </div>
   )
