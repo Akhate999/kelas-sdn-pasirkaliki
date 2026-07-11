@@ -5,27 +5,23 @@ import { supabase } from '@/lib/supabase'
 import Navbar from '@/components/Navbar'
 import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
-import { Plus, X, Save, BookOpen, CheckCircle, Clock, ChevronRight } from 'lucide-react'
+import { Plus, X, Save, BookOpen, CheckCircle, ChevronRight } from 'lucide-react'
 
 const MAPEL = ['Pendidikan Agama','PPKn','Bahasa Indonesia','Matematika','IPA','IPS','PJOK','Seni Budaya','Bahasa Inggris','Muatan Lokal']
 
 export default function BabPage() {
   const router = useRouter()
-  const [profile, setProfile] = useState(null)
-  const [kelas, setKelas]     = useState(null)
-  const [babList, setBabList] = useState([])
+  const [profile, setProfile]   = useState(null)
+  const [kelas, setKelas]       = useState(null)
+  const [babList, setBabList]   = useState([])
   const [showForm, setShowForm] = useState(false)
   const [loading, setLoading]   = useState(true)
   const [saving, setSaving]     = useState(false)
   const [filterMapel, setFilterMapel] = useState('Semua')
   const [form, setForm] = useState({
-    mata_pelajaran: 'Matematika',
-    nomor_bab: '',
-    judul_bab: '',
+    mata_pelajaran: 'Matematika', nomor_bab: '1', judul_bab: '',
     tanggal_mulai: format(new Date(), 'yyyy-MM-dd'),
-    tanggal_selesai: '',
-    semester: 'Semester 1',
-    tahun_ajaran: '',
+    tanggal_selesai: '', semester: 'Semester 1', tahun_ajaran: '2025/2026',
   })
 
   useEffect(() => {
@@ -37,7 +33,7 @@ export default function BabPage() {
       const { data: kls } = await supabase.from('kelas').select('*').eq('wali_kelas_id', prof.id).single()
       setKelas(kls)
       if (kls) {
-        setForm(f => ({ ...f, tahun_ajaran: kls.tahun_ajaran }))
+        setForm(f => ({ ...f, tahun_ajaran: kls.tahun_ajaran || '2025/2026' }))
         loadBab(kls.id)
       }
       setLoading(false)
@@ -53,22 +49,35 @@ export default function BabPage() {
   }
 
   async function handleSave() {
-    if (!form.judul_bab.trim() || !form.nomor_bab) return
+    if (!form.judul_bab.trim()) {
+      alert('Judul bab harus diisi.')
+      return
+    }
     setSaving(true)
-    await supabase.from('bab_pembelajaran').insert({
-      ...form,
+    const { error } = await supabase.from('bab_pembelajaran').insert({
+      mata_pelajaran: form.mata_pelajaran,
+      nomor_bab: parseInt(form.nomor_bab) || 1,
+      judul_bab: form.judul_bab.trim(),
+      tanggal_mulai: form.tanggal_mulai,
+      tanggal_selesai: form.tanggal_selesai || null,
+      semester: form.semester,
+      tahun_ajaran: form.tahun_ajaran || kelas?.tahun_ajaran || '2025/2026',
       kelas_id: kelas.id,
       status: 'berlangsung'
     })
+    if (error) {
+      alert('Gagal menyimpan: ' + error.message)
+      setSaving(false)
+      return
+    }
     setSaving(false)
     setShowForm(false)
-    setForm({ mata_pelajaran: 'Matematika', nomor_bab: '', judul_bab: '', tanggal_mulai: format(new Date(), 'yyyy-MM-dd'), tanggal_selesai: '', semester: 'Semester 1', tahun_ajaran: kelas.tahun_ajaran })
+    setForm({ mata_pelajaran: 'Matematika', nomor_bab: '1', judul_bab: '', tanggal_mulai: format(new Date(), 'yyyy-MM-dd'), tanggal_selesai: '', semester: 'Semester 1', tahun_ajaran: kelas?.tahun_ajaran || '2025/2026' })
     loadBab(kelas.id)
   }
 
   async function selesaikanBab(babId) {
-    const tgl = format(new Date(), 'yyyy-MM-dd')
-    await supabase.from('bab_pembelajaran').update({ status: 'selesai', tanggal_selesai: tgl }).eq('id', babId)
+    await supabase.from('bab_pembelajaran').update({ status: 'selesai', tanggal_selesai: format(new Date(), 'yyyy-MM-dd') }).eq('id', babId)
     loadBab(kelas.id)
   }
 
@@ -93,7 +102,6 @@ export default function BabPage() {
           <p className="text-navy-300 text-xs">{kelas?.nama} · Kelola bab per mata pelajaran</p>
         </div>
 
-        {/* Rekap */}
         <div className="px-4 -mt-5 mb-4">
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 grid grid-cols-2 divide-x">
             <div className="p-3 text-center">
@@ -113,7 +121,6 @@ export default function BabPage() {
           </button>
         </div>
 
-        {/* Filter mapel */}
         <div className="px-4 mb-4">
           <div className="flex gap-2 overflow-x-auto pb-1">
             {['Semua', ...MAPEL].map(m => (
@@ -126,7 +133,6 @@ export default function BabPage() {
           </div>
         </div>
 
-        {/* List bab */}
         <div className="px-4 space-y-3">
           {filtered.length === 0 && (
             <div className="card text-center py-8">
@@ -146,9 +152,7 @@ export default function BabPage() {
                     <span className="text-xs text-gray-400">{b.mata_pelajaran}</span>
                   </div>
                   <p className="text-sm font-bold text-gray-800">Bab {b.nomor_bab}: {b.judul_bab}</p>
-                  <p className="text-xs text-gray-400 mt-1">
-                    {b.semester} · {b.tahun_ajaran}
-                  </p>
+                  <p className="text-xs text-gray-400 mt-1">{b.semester} · {b.tahun_ajaran}</p>
                   <p className="text-xs text-gray-400">
                     Mulai: {format(new Date(b.tanggal_mulai + 'T00:00:00'), 'd MMM yyyy', { locale: id })}
                     {b.tanggal_selesai ? ` · Selesai: ${format(new Date(b.tanggal_selesai + 'T00:00:00'), 'd MMM yyyy', { locale: id })}` : ''}
@@ -175,7 +179,6 @@ export default function BabPage() {
         </div>
       </main>
 
-      {/* Form tambah bab */}
       {showForm && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-end">
           <div className="bg-white w-full rounded-t-2xl p-5 space-y-4 max-h-[90vh] overflow-y-auto">
@@ -205,7 +208,7 @@ export default function BabPage() {
             </div>
             <div>
               <label className="label">Judul Bab</label>
-              <input className="input" placeholder="Contoh: Bilangan Cacah"
+              <input className="input" placeholder="Contoh: Rumah dan Lingkunganku"
                 value={form.judul_bab} onChange={e => setForm(p => ({ ...p, judul_bab: e.target.value }))} />
             </div>
             <div>
