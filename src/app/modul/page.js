@@ -15,9 +15,14 @@ export default function ModulPage() {
   const [showForm, setShowForm] = useState(false)
   const [loading, setLoading]   = useState(true)
   const [uploading, setUploading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState('')
   const [filterMapel, setFilterMapel] = useState('Semua')
-  const [form, setForm] = useState({ judul: '', mata_pelajaran: 'Matematika', tingkat: '', urutan: '1', deskripsi: '' })
-  const [file, setFile] = useState(null)
+
+  const [judul, setJudul] = useState('')
+  const [mataPelajaran, setMataPelajaran] = useState('Matematika')
+  const [tingkat, setTingkat] = useState('')
+  const [jumlahBagian, setJumlahBagian] = useState('1')
+  const [bagianList, setBagianList] = useState([{ file: null, deskripsi: '' }])
 
   useEffect(() => {
     async function load() {
@@ -34,35 +39,76 @@ export default function ModulPage() {
   }, [router])
 
   async function loadModul() {
-    const { data } = await supabase.from('modul_ajar').select('*').order('mata_pelajaran').order('urutan')
+    const { data } = await supabase.from('modul_ajar').select('*').order('mata_pelajaran').order('judul').order('urutan')
     setModul(data || [])
   }
 
+  // Ketika jumlah bagian berubah, sesuaikan jumlah slot upload
+  function handleJumlahBagianChange(val) {
+    setJumlahBagian(val)
+    const n = Math.max(1, parseInt(val) || 1)
+    setBagianList(prev => {
+      const list = [...prev]
+      while (list.length < n) list.push({ file: null, deskripsi: '' })
+      while (list.length > n) list.pop()
+      return list
+    })
+  }
+
+  function updateBagian(index, field, value) {
+    setBagianList(prev => {
+      const list = [...prev]
+      list[index] = { ...list[index], [field]: value }
+      return list
+    })
+  }
+
+  function resetForm() {
+    setJudul('')
+    setMataPelajaran('Matematika')
+    setTingkat('')
+    setJumlahBagian('1')
+    setBagianList([{ file: null, deskripsi: '' }])
+  }
+
   async function handleUpload() {
-    if (!form.judul.trim()) return
+    if (!judul.trim()) { alert('Judul modul harus diisi.'); return }
+    const adaFile = bagianList.some(b => b.file)
+    if (!adaFile) { alert('Upload minimal satu file PDF.'); return }
+
     setUploading(true)
-    let fileUrl = null
-    if (file) {
-      const ext = file.name.split('.').pop()
-      const fileName = `${Date.now()}_${form.judul.replace(/\s+/g,'_')}.${ext}`
-      const { error: uploadError } = await supabase.storage.from('modul-ajar').upload(fileName, file)
+    const { data: { user } } = await supabase.auth.getUser()
+
+    for (let i = 0; i < bagianList.length; i++) {
+      const bagian = bagianList[i]
+      if (!bagian.file) continue
+
+      setUploadProgress(`Mengupload bagian ${i + 1} dari ${bagianList.length}...`)
+      const ext = bagian.file.name.split('.').pop()
+      const fileName = `${Date.now()}_${judul.replace(/\s+/g,'_')}_bagian${i + 1}.${ext}`
+      const { error: uploadError } = await supabase.storage.from('modul-ajar').upload(fileName, bagian.file)
+
+      let fileUrl = null
       if (!uploadError) {
         const { data: urlData } = supabase.storage.from('modul-ajar').getPublicUrl(fileName)
         fileUrl = urlData.publicUrl
       }
+
+      await supabase.from('modul_ajar').insert({
+        judul: bagianList.length > 1 ? `${judul} - Bagian ${i + 1}` : judul,
+        mata_pelajaran: mataPelajaran,
+        tingkat: tingkat ? parseInt(tingkat) : null,
+        urutan: i + 1,
+        deskripsi: bagian.deskripsi,
+        file_url: fileUrl,
+        uploaded_by: user.id
+      })
     }
-    const { data: { user } } = await supabase.auth.getUser()
-    await supabase.from('modul_ajar').insert({
-      ...form,
-      tingkat: form.tingkat ? parseInt(form.tingkat) : null,
-      urutan: parseInt(form.urutan) || 1,
-      file_url: fileUrl,
-      uploaded_by: user.id
-    })
+
     setUploading(false)
+    setUploadProgress('')
     setShowForm(false)
-    setForm({ judul: '', mata_pelajaran: 'Matematika', tingkat: '', urutan: '1', deskripsi: '' })
-    setFile(null)
+    resetForm()
     loadModul()
   }
 
@@ -104,51 +150,69 @@ export default function ModulPage() {
           </div>
         </div>
 
+        {/* Form upload */}
         {showForm && (
           <div className="fixed inset-0 bg-black/50 z-50 flex items-end">
             <div className="bg-white w-full rounded-t-2xl p-5 space-y-4 max-h-[90vh] overflow-y-auto">
               <div className="flex items-center justify-between">
                 <h3 className="font-bold text-navy-800">Upload Modul Ajar</h3>
-                <button onClick={() => setShowForm(false)}><X size={20} className="text-gray-400" /></button>
+                <button onClick={() => { setShowForm(false); resetForm() }}><X size={20} className="text-gray-400" /></button>
               </div>
+
               <div>
                 <label className="label">Judul Modul</label>
-                <input className="input" placeholder="Contoh: Bilangan Cacah" value={form.judul} onChange={e => setForm(p => ({ ...p, judul: e.target.value }))} />
+                <input className="input" placeholder="Contoh: Bilangan Cacah" value={judul} onChange={e => setJudul(e.target.value)} />
               </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="label">Mata Pelajaran</label>
-                  <select className="input" value={form.mata_pelajaran} onChange={e => setForm(p => ({ ...p, mata_pelajaran: e.target.value }))}>
+                  <select className="input" value={mataPelajaran} onChange={e => setMataPelajaran(e.target.value)}>
                     {MAPEL.map(m => <option key={m} value={m}>{m}</option>)}
                   </select>
                 </div>
                 <div>
                   <label className="label">Untuk Kelas</label>
-                  <select className="input" value={form.tingkat} onChange={e => setForm(p => ({ ...p, tingkat: e.target.value }))}>
+                  <select className="input" value={tingkat} onChange={e => setTingkat(e.target.value)}>
                     <option value="">Semua</option>
                     {[1,2,3,4,5,6].map(n => <option key={n} value={n}>Kelas {n}</option>)}
                   </select>
                 </div>
               </div>
+
               <div>
-                <label className="label">Modul ke- (urutan tampil)</label>
-                <input type="number" min="1" className="input" placeholder="1" value={form.urutan} onChange={e => setForm(p => ({ ...p, urutan: e.target.value }))} />
-                <p className="text-xs text-gray-400 mt-1">Menentukan urutan modul di daftar isi e-book</p>
+                <label className="label">Bagian (jumlah file PDF)</label>
+                <input type="number" min="1" max="20" className="input" value={jumlahBagian}
+                  onChange={e => handleJumlahBagianChange(e.target.value)} />
+                <p className="text-xs text-gray-400 mt-1">Isi jumlah bagian/file yang akan diupload sekaligus</p>
               </div>
-              <div>
-                <label className="label">Deskripsi (opsional)</label>
-                <textarea className="input h-20 resize-none" value={form.deskripsi} onChange={e => setForm(p => ({ ...p, deskripsi: e.target.value }))} />
+
+              {/* Slot upload dinamis */}
+              <div className="space-y-3">
+                {bagianList.map((bagian, idx) => (
+                  <div key={idx} className="bg-gray-50 rounded-xl p-3 border border-gray-100">
+                    <p className="text-xs font-semibold text-navy-700 mb-2">Bagian {idx + 1}</p>
+                    <div className="space-y-2">
+                      <label className="flex items-center gap-2 border-2 border-dashed border-gray-200 rounded-lg p-3 cursor-pointer hover:border-navy-300 transition-colors bg-white">
+                        <Upload size={16} className="text-gray-400 flex-shrink-0" />
+                        <span className="text-xs text-gray-500 truncate">{bagian.file ? bagian.file.name : 'Pilih File PDF'}</span>
+                        <input type="file" className="hidden" accept=".pdf"
+                          onChange={e => updateBagian(idx, 'file', e.target.files[0])} />
+                      </label>
+                      <input className="input text-sm" placeholder="Deskripsi bagian ini..."
+                        value={bagian.deskripsi} onChange={e => updateBagian(idx, 'deskripsi', e.target.value)} />
+                    </div>
+                  </div>
+                ))}
               </div>
-              <div>
-                <label className="label">File PDF</label>
-                <label className="flex items-center gap-3 border-2 border-dashed border-gray-200 rounded-xl p-4 cursor-pointer hover:border-navy-300 transition-colors">
-                  <Upload size={20} className="text-gray-400" />
-                  <span className="text-sm text-gray-500">{file ? file.name : 'Pilih file PDF'}</span>
-                  <input type="file" className="hidden" accept=".pdf" onChange={e => setFile(e.target.files[0])} />
-                </label>
-              </div>
-              <button onClick={handleUpload} disabled={uploading} className="btn-primary w-full py-3 flex items-center justify-center gap-2 disabled:opacity-60">
-                <Upload size={16} /> {uploading ? 'Mengupload...' : 'Simpan Modul'}
+
+              {uploadProgress && (
+                <p className="text-xs text-navy-600 text-center">{uploadProgress}</p>
+              )}
+
+              <button onClick={handleUpload} disabled={uploading}
+                className="btn-primary w-full py-3 flex items-center justify-center gap-2 disabled:opacity-60">
+                <Upload size={16} /> {uploading ? 'Mengupload...' : `Simpan ${bagianList.length > 1 ? `${bagianList.length} Bagian` : 'Modul'}`}
               </button>
             </div>
           </div>
@@ -166,9 +230,8 @@ export default function ModulPage() {
                 <FileText size={20} className="text-red-500" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-xs text-gray-400">Modul {m.urutan || '-'}</p>
+                <p className="text-xs text-gray-400">{m.mata_pelajaran}{m.tingkat ? ` · Kelas ${m.tingkat}` : ''}</p>
                 <p className="text-sm font-bold text-gray-800">{m.judul}</p>
-                <p className="text-xs text-gray-500">{m.mata_pelajaran}{m.tingkat ? ` · Kelas ${m.tingkat}` : ''}</p>
                 {m.deskripsi && <p className="text-xs text-gray-400 mt-1">{m.deskripsi}</p>}
                 <div className="flex gap-3 mt-2">
                   {m.file_url && (
