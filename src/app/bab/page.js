@@ -169,9 +169,9 @@ export default function BabPage() {
                     <CheckCircle size={12} /> Tandai Selesai
                   </button>
                 )}
-                <button onClick={() => router.push(`/bab/${b.id}/laporan`)}
+                <button onClick={() => router.push(`/bab/${b.id}/rekap`)}
                   className="flex-1 text-xs py-2 rounded-lg bg-navy-50 text-navy-700 font-semibold border border-navy-200 flex items-center justify-center gap-1">
-                  <ChevronRight size={12} /> Buat Laporan
+                  <ChevronRight size={12} /> Lihat Rekap
                 </button>
               </div>
             </div>
