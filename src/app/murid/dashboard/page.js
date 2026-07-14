@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
-import { LogOut, Award, BarChart2, ClipboardList, BookMarked, ChevronDown, ChevronUp } from 'lucide-react'
+import { LogOut, Award, BarChart2, ClipboardList, BookMarked, BookOpen, ChevronDown, ChevronUp } from 'lucide-react'
 
 const STATUS_BADGE = {
   hadir: 'badge-hadir', sakit: 'badge-sakit', izin: 'badge-izin', alpha: 'badge-alpha'
@@ -92,6 +92,17 @@ export default function MuridDashboard() {
             <LogOut size={20} />
           </button>
         </div>
+
+        <button onClick={() => router.push('/murid/modul')}
+          className="mt-4 w-full bg-navy-700 hover:bg-navy-600 transition-colors rounded-xl px-4 py-3 flex items-center gap-3">
+          <div className="w-9 h-9 bg-gold-400 rounded-lg flex items-center justify-center flex-shrink-0">
+            <BookOpen size={18} className="text-navy-900" />
+          </div>
+          <div className="text-left flex-1">
+            <p className="text-white text-sm font-semibold">Modul Ajar</p>
+            <p className="text-navy-300 text-xs">Baca buku pelajaran</p>
+          </div>
+        </button>
 
         {/* Rekap absensi */}
         <div className="mt-4 grid grid-cols-4 gap-2">
