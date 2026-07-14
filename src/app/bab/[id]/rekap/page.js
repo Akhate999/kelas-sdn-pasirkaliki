@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase'
 import Navbar from '@/components/Navbar'
 import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
-import { ChevronDown, ChevronUp, User } from 'lucide-react'
+import { ChevronDown, ChevronUp, User, Printer } from 'lucide-react'
 
 const SKALA_LABEL = { 1: 'Kurang', 2: 'Cukup', 3: 'Baik', 4: 'Sangat Baik' }
 const SKALA_COLOR = { 1: 'text-red-600', 2: 'text-yellow-600', 3: 'text-blue-600', 4: 'text-green-600' }
@@ -86,6 +86,131 @@ export default function RekapBabPage() {
       }
     }
     setRekapData(rekap)
+  }
+
+  function cetakLaporan(m, r) {
+    const nilaiEval = r.sumatif.find(s => s.jenis === 'Ulangan Harian') || r.sumatif[0]
+    const pctHadir = r.absensi.totalHari > 0 ? Math.round((r.absensi.hadir / r.absensi.totalHari) * 100) : 0
+    const tanggalCetak = format(new Date(), 'd MMMM yyyy', { locale: id })
+    const periodeBab = `${bab.tanggal_mulai ? format(new Date(bab.tanggal_mulai + 'T00:00:00'), 'd MMM', { locale: id }) : ''}${bab.tanggal_selesai ? ' – ' + format(new Date(bab.tanggal_selesai + 'T00:00:00'), 'd MMM yyyy', { locale: id }) : ''}`
+
+    const html = `<!DOCTYPE html>
+<html><head><meta charset="UTF-8">
+<title>Laporan ${m.nama} - Bab ${bab.nomor_bab}</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: Arial, sans-serif; color: #222; padding: 30px 40px; }
+  .kop { display: flex; align-items: center; gap: 16px; border-bottom: 3px solid #163a61; padding-bottom: 14px; margin-bottom: 20px; }
+  .kop img { width: 64px; height: 64px; object-fit: contain; }
+  .kop .nama-sekolah { font-size: 18px; font-weight: bold; color: #163a61; }
+  .kop .alamat { font-size: 11px; color: #555; margin-top: 2px; }
+  h1 { text-align: center; font-size: 16px; color: #163a61; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+  .subjudul { text-align: center; font-size: 12px; color: #666; margin-bottom: 20px; }
+  table.info { width: 100%; margin-bottom: 20px; font-size: 12px; }
+  table.info td { padding: 3px 0; }
+  table.info td.label { width: 130px; color: #555; }
+  .section { margin-bottom: 18px; }
+  .section-title { font-size: 13px; font-weight: bold; color: #163a61; border-bottom: 1px solid #ddd; padding-bottom: 4px; margin-bottom: 8px; }
+  table.data { width: 100%; border-collapse: collapse; font-size: 12px; }
+  table.data th { background: #163a61; color: white; padding: 6px 8px; text-align: left; }
+  table.data td { padding: 6px 8px; border-bottom: 1px solid #eee; }
+  .rekap-grid { display: flex; gap: 10px; }
+  .rekap-item { flex: 1; text-align: center; border: 1px solid #eee; border-radius: 6px; padding: 8px; }
+  .rekap-item .angka { font-size: 20px; font-weight: bold; color: #163a61; }
+  .rekap-item .label { font-size: 10px; color: #666; }
+  .narasi-box { border: 1px solid #ddd; border-radius: 6px; padding: 12px; font-size: 12px; line-height: 1.6; min-height: 80px; }
+  .ttd { display: flex; justify-content: space-between; margin-top: 40px; font-size: 12px; }
+  .ttd .kolom { text-align: center; width: 200px; }
+  .ttd .garis { margin-top: 50px; border-top: 1px solid #333; padding-top: 4px; }
+  .footer { text-align: center; font-size: 10px; color: #999; margin-top: 30px; }
+  @media print { .no-print { display: none; } body { padding: 15px 25px; } }
+</style>
+</head>
+<body>
+  <div class="no-print" style="text-align:center;margin-bottom:20px">
+    <button onclick="window.print()" style="background:#163a61;color:white;border:none;padding:10px 24px;border-radius:8px;font-size:14px;cursor:pointer">🖨️ Cetak / Simpan sebagai PDF</button>
+  </div>
+
+  <div class="kop">
+    <img src="/logo-sdn.png" alt="Logo" />
+    <div>
+      <div class="nama-sekolah">SDN PASIRKALIKI I</div>
+      <div class="alamat">Dusun Sempur Rt 11 Rw 03, Desa Pasirkaliki, Kec. Rawamerta, Kabupaten Karawang</div>
+    </div>
+  </div>
+
+  <h1>Laporan Perkembangan Belajar</h1>
+  <p class="subjudul">Bab ${bab.nomor_bab}: ${bab.judul_bab} · ${bab.mata_pelajaran}</p>
+
+  <table class="info">
+    <tr><td class="label">Nama Murid</td><td>: ${m.nama}</td></tr>
+    <tr><td class="label">Kelas</td><td>: ${kelas.nama}</td></tr>
+    <tr><td class="label">NIS / NISN</td><td>: ${m.nis || '-'} / ${m.nisn || '-'}</td></tr>
+    <tr><td class="label">Periode Bab</td><td>: ${periodeBab}</td></tr>
+    <tr><td class="label">Tahun Ajaran</td><td>: ${bab.tahun_ajaran} · ${bab.semester}</td></tr>
+  </table>
+
+  <div class="section">
+    <div class="section-title">Kehadiran (${pctHadir}%)</div>
+    <div class="rekap-grid">
+      <div class="rekap-item"><div class="angka">${r.absensi.hadir}</div><div class="label">Hadir</div></div>
+      <div class="rekap-item"><div class="angka">${r.absensi.sakit}</div><div class="label">Sakit</div></div>
+      <div class="rekap-item"><div class="angka">${r.absensi.izin}</div><div class="label">Izin</div></div>
+      <div class="rekap-item"><div class="angka">${r.absensi.alpha}</div><div class="label">Alpha</div></div>
+    </div>
+  </div>
+
+  ${r.formatif.jumlahPertemuan > 0 ? `
+  <div class="section">
+    <div class="section-title">Penilaian Proses Pembelajaran (${r.formatif.jumlahPertemuan} pertemuan)</div>
+    <table class="data">
+      <tr><th>Aspek</th><th>Rata-rata</th><th>Keterangan</th></tr>
+      <tr><td>Keaktifan</td><td>${r.formatif.keaktifan ? parseFloat(r.formatif.keaktifan).toFixed(1) : '-'}/4</td><td>${SKALA_LABEL[Math.round(r.formatif.keaktifan)] || '-'}</td></tr>
+      <tr><td>Fokus</td><td>${r.formatif.fokus ? parseFloat(r.formatif.fokus).toFixed(1) : '-'}/4</td><td>${SKALA_LABEL[Math.round(r.formatif.fokus)] || '-'}</td></tr>
+      <tr><td>Pemahaman</td><td>${r.formatif.pemahaman ? parseFloat(r.formatif.pemahaman).toFixed(1) : '-'}/4</td><td>${SKALA_LABEL[Math.round(r.formatif.pemahaman)] || '-'}</td></tr>
+    </table>
+  </div>` : ''}
+
+  ${r.sumatif.length > 0 ? `
+  <div class="section">
+    <div class="section-title">Nilai Evaluasi</div>
+    <table class="data">
+      <tr><th>Jenis</th><th>Nilai</th></tr>
+      ${r.sumatif.map(s => `<tr><td>${s.jenis}</td><td>${s.nilai}</td></tr>`).join('')}
+    </table>
+  </div>` : ''}
+
+  ${r.karakter.length > 0 ? `
+  <div class="section">
+    <div class="section-title">Catatan Karakter</div>
+    <table class="data">
+      <tr><th>Kategori</th><th>Catatan</th></tr>
+      ${r.karakter.map(c => `<tr><td style="text-transform:capitalize">${c.kategori}</td><td>${c.catatan}</td></tr>`).join('')}
+    </table>
+  </div>` : ''}
+
+  <div class="section">
+    <div class="section-title">Catatan Wali Kelas</div>
+    <div class="narasi-box">Tuliskan catatan perkembangan murid di sini sebelum dicetak...</div>
+  </div>
+
+  <div class="ttd">
+    <div class="kolom">
+      <p>Karawang, ${tanggalCetak}</p>
+      <p class="garis">Orang Tua / Wali</p>
+    </div>
+    <div class="kolom">
+      <p>&nbsp;</p>
+      <p class="garis">${profile.nama}<br/>Wali Kelas ${kelas.nama}</p>
+    </div>
+  </div>
+
+  <div class="footer">Dicetak melalui Sistem Informasi Kelas SDN Pasirkaliki I pada ${tanggalCetak}</div>
+</body></html>`
+
+    const win = window.open('', '_blank')
+    win.document.write(html)
+    win.document.close()
   }
 
   if (loading) return <div className="min-h-screen flex items-center justify-center"><p className="text-gray-400 text-sm">Memuat rekap...</p></div>
@@ -210,9 +335,13 @@ export default function RekapBabPage() {
 
                     {/* Tombol aksi */}
                     <div className="flex gap-2 pt-1">
+                      <button onClick={() => cetakLaporan(m, r)}
+                        className="flex-1 text-xs py-2 rounded-lg bg-purple-50 text-purple-700 font-semibold border border-purple-200 flex items-center justify-center gap-1">
+                        <Printer size={12} /> Cetak PDF
+                      </button>
                       <button onClick={() => router.push(`/bab/${babId}/laporan`)}
                         className="flex-1 text-xs py-2 rounded-lg bg-navy-50 text-navy-700 font-semibold border border-navy-200">
-                        Buat Laporan
+                        Laporan WA
                       </button>
                     </div>
                   </div>
