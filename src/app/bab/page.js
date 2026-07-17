@@ -7,7 +7,7 @@ import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
 import { Plus, X, Save, BookOpen, CheckCircle, ChevronRight } from 'lucide-react'
 
-const MAPEL = ['Pendidikan Agama','PPKn','Bahasa Indonesia','Matematika','IPA','IPS','PJOK','Seni Budaya','Bahasa Inggris','Muatan Lokal']
+const MAPEL = ['Pendidikan Agama','PPKn','Bahasa Indonesia','Matematika','IPAS','PJOK','Seni Budaya','Bahasa Inggris','Muatan Lokal']
 
 export default function BabPage() {
   const router = useRouter()
