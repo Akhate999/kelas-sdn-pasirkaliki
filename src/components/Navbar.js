@@ -18,6 +18,7 @@ const menuItems = [
   { href: '/bab',        label: 'Bab & Laporan',       icon: BookMarked },
   { href: '/modul',      label: 'Modul Ajar',          icon: BookOpen },
   { href: '/murid',      label: 'Data Murid',          icon: Users },
+  { href: '/laporan',    label: 'Laporan Administrasi', icon: FileBarChart },
 ]
 
 export default function Navbar({ namaGuru, namaKelas }) {
