@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase'
 import Navbar from '@/components/Navbar'
 import { Plus, X, Upload, FileText, Download, BookOpen } from 'lucide-react'
 
-const MAPEL = ['Pendidikan Agama','PPKn','Bahasa Indonesia','Matematika','IPA','IPS','PJOK','Seni Budaya','Bahasa Inggris','Muatan Lokal']
+const MAPEL = ['Pendidikan Agama','PPKn','Bahasa Indonesia','Matematika','IPAS','PJOK','Seni Budaya','Bahasa Inggris','Muatan Lokal']
 
 export default function ModulPage() {
   const router = useRouter()
