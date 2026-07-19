@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase'
 import Navbar from '@/components/Navbar'
 import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
-import { Plus, X, Save, BookOpen, CheckCircle, ChevronRight } from 'lucide-react'
+import { Plus, X, Save, BookOpen, CheckCircle, ChevronRight, FileText } from 'lucide-react'
 
 const MAPEL = ['Pendidikan Agama','PPKn','Bahasa Indonesia','Matematika','IPAS','PJOK','Seni Budaya','Bahasa Inggris','Muatan Lokal']
 
@@ -14,6 +14,8 @@ export default function BabPage() {
   const [profile, setProfile]   = useState(null)
   const [kelas, setKelas]       = useState(null)
   const [babList, setBabList]   = useState([])
+  const [modulList, setModulList] = useState([])
+  const [rppList, setRppList]     = useState([])
   const [showForm, setShowForm] = useState(false)
   const [loading, setLoading]   = useState(true)
   const [saving, setSaving]     = useState(false)
@@ -22,6 +24,7 @@ export default function BabPage() {
     mata_pelajaran: 'Matematika', nomor_bab: '1', judul_bab: '',
     tanggal_mulai: format(new Date(), 'yyyy-MM-dd'),
     tanggal_selesai: '', semester: 'Semester 1', tahun_ajaran: '2025/2026',
+    modul_ajar_id: '', rpp_id: ''
   })
 
   useEffect(() => {
@@ -36,6 +39,10 @@ export default function BabPage() {
         setForm(f => ({ ...f, tahun_ajaran: kls.tahun_ajaran || '2025/2026' }))
         loadBab(kls.id)
       }
+      const { data: modul } = await supabase.from('modul_ajar').select('*').order('mata_pelajaran').order('urutan')
+      setModulList(modul || [])
+      const { data: rpp } = await supabase.from('rpp').select('*').order('mata_pelajaran')
+      setRppList(rpp || [])
       setLoading(false)
     }
     load()
@@ -46,6 +53,15 @@ export default function BabPage() {
       .select('*').eq('kelas_id', kelasId)
       .order('created_at', { ascending: false })
     setBabList(data || [])
+  }
+
+  function handleMapelChange(mapel) {
+    setForm(p => ({ ...p, mata_pelajaran: mapel, modul_ajar_id: '', rpp_id: '' }))
+  }
+
+  function handleModulPilih(modulId) {
+    const modul = modulList.find(m => m.id === modulId)
+    setForm(p => ({ ...p, modul_ajar_id: modulId, judul_bab: modul ? modul.judul : p.judul_bab }))
   }
 
   async function handleSave() {
@@ -63,7 +79,9 @@ export default function BabPage() {
       semester: form.semester,
       tahun_ajaran: form.tahun_ajaran || kelas?.tahun_ajaran || '2025/2026',
       kelas_id: kelas.id,
-      status: 'berlangsung'
+      status: 'berlangsung',
+      modul_ajar_id: form.modul_ajar_id || null,
+      rpp_id: form.rpp_id || null,
     })
     if (error) {
       alert('Gagal menyimpan: ' + error.message)
@@ -72,7 +90,7 @@ export default function BabPage() {
     }
     setSaving(false)
     setShowForm(false)
-    setForm({ mata_pelajaran: 'Matematika', nomor_bab: '1', judul_bab: '', tanggal_mulai: format(new Date(), 'yyyy-MM-dd'), tanggal_selesai: '', semester: 'Semester 1', tahun_ajaran: kelas?.tahun_ajaran || '2025/2026' })
+    setForm({ mata_pelajaran: 'Matematika', nomor_bab: '1', judul_bab: '', tanggal_mulai: format(new Date(), 'yyyy-MM-dd'), tanggal_selesai: '', semester: 'Semester 1', tahun_ajaran: kelas?.tahun_ajaran || '2025/2026', modul_ajar_id: '', rpp_id: '' })
     loadBab(kelas.id)
   }
 
@@ -90,6 +108,8 @@ export default function BabPage() {
   const filtered = filterMapel === 'Semua' ? babList : babList.filter(b => b.mata_pelajaran === filterMapel)
   const berlangsung = babList.filter(b => b.status === 'berlangsung').length
   const selesai = babList.filter(b => b.status === 'selesai').length
+  const modulUntukMapel = modulList.filter(m => m.mata_pelajaran === form.mata_pelajaran)
+  const rppUntukMapel = rppList.filter(r => r.mata_pelajaran === form.mata_pelajaran)
 
   if (loading) return <div className="min-h-screen flex items-center justify-center"><p className="text-gray-400 text-sm">Memuat...</p></div>
 
@@ -157,6 +177,12 @@ export default function BabPage() {
                     Mulai: {format(new Date(b.tanggal_mulai + 'T00:00:00'), 'd MMM yyyy', { locale: id })}
                     {b.tanggal_selesai ? ` · Selesai: ${format(new Date(b.tanggal_selesai + 'T00:00:00'), 'd MMM yyyy', { locale: id })}` : ''}
                   </p>
+                  {(b.modul_ajar_id || b.rpp_id) && (
+                    <div className="flex gap-2 mt-1">
+                      {b.modul_ajar_id && <span className="text-xs text-purple-600 flex items-center gap-1"><BookOpen size={10} /> Modul terhubung</span>}
+                      {b.rpp_id && <span className="text-xs text-navy-600 flex items-center gap-1"><FileText size={10} /> RPP terhubung</span>}
+                    </div>
+                  )}
                 </div>
                 <button onClick={() => handleDelete(b.id)} className="text-gray-300 hover:text-red-400 ml-2 flex-shrink-0">
                   <X size={16} />
@@ -188,10 +214,29 @@ export default function BabPage() {
             </div>
             <div>
               <label className="label">Mata Pelajaran</label>
-              <select className="input" value={form.mata_pelajaran} onChange={e => setForm(p => ({ ...p, mata_pelajaran: e.target.value }))}>
+              <select className="input" value={form.mata_pelajaran} onChange={e => handleMapelChange(e.target.value)}>
                 {MAPEL.map(m => <option key={m} value={m}>{m}</option>)}
               </select>
             </div>
+
+            <div>
+              <label className="label">Pilih Modul/Buku (opsional)</label>
+              <select className="input" value={form.modul_ajar_id} onChange={e => handleModulPilih(e.target.value)}>
+                <option value="">-- Tidak pakai modul --</option>
+                {modulUntukMapel.map(m => <option key={m.id} value={m.id}>{m.judul}</option>)}
+              </select>
+              {modulUntukMapel.length === 0 && <p className="text-xs text-gray-400 mt-1">Belum ada modul untuk {form.mata_pelajaran}</p>}
+            </div>
+
+            <div>
+              <label className="label">Pilih RPP (opsional)</label>
+              <select className="input" value={form.rpp_id} onChange={e => setForm(p => ({ ...p, rpp_id: e.target.value }))}>
+                <option value="">-- Tidak pakai RPP --</option>
+                {rppUntukMapel.map(r => <option key={r.id} value={r.id}>{r.judul}</option>)}
+              </select>
+              {rppUntukMapel.length === 0 && <p className="text-xs text-gray-400 mt-1">Belum ada RPP untuk {form.mata_pelajaran}. <button onClick={() => router.push('/rpp')} className="underline text-navy-600">Buat RPP dulu</button></p>}
+            </div>
+
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="label">Nomor Bab</label>
