@@ -16,7 +16,7 @@ export default function LaporanBabPage() {
   const [kelas, setKelas]     = useState(null)
   const [bab, setBab]         = useState(null)
   const [muridList, setMuridList] = useState([])
-  const [laporan, setLaporan] = useState({}) // { muridId: { narasi, loading } }
+  const [laporan, setLaporan] = useState({})
   const [loading, setLoading] = useState(true)
   const [expandedMurid, setExpandedMurid] = useState(null)
 
@@ -40,10 +40,9 @@ export default function LaporanBabPage() {
   }, [babId, router])
 
   async function buatLaporanSatuMurid(murid) {
-    setLaporan(prev => ({ ...prev, [murid.id]: { narasi: '', loading: true } }))
+    setLaporan(prev => ({ ...prev, [murid.id]: { narasi: '', loading: true, error: '' } }))
     setExpandedMurid(murid.id)
 
-    // Ambil data murid selama periode bab
     const tglMulai = bab.tanggal_mulai
     const tglSelesai = bab.tanggal_selesai || format(new Date(), 'yyyy-MM-dd')
 
@@ -54,7 +53,6 @@ export default function LaporanBabPage() {
       supabase.from('catatan_karakter').select('*').eq('murid_id', murid.id).gte('tanggal', tglMulai).lte('tanggal', tglSelesai),
     ])
 
-    // Hitung rekap
     const totalHadir = (absensi || []).filter(a => a.status === 'hadir').length
     const totalAbsen = (absensi || []).length
     const rataFormatif = formatif?.length > 0
@@ -62,7 +60,6 @@ export default function LaporanBabPage() {
       : null
     const nilaiEvaluasi = sumatif?.find(s => s.jenis === 'Ulangan Harian' || s.jenis === 'UTS')
 
-    // Panggil Claude API
     const prompt = `Kamu adalah wali kelas SD yang menulis laporan perkembangan murid kepada orang tua. Tulis laporan dalam Bahasa Indonesia yang hangat, mudah dipahami orang tua, dan positif namun jujur.
 
 Data murid:
@@ -86,20 +83,19 @@ Tulis laporan singkat (3-4 paragraf) yang mencakup:
 Langsung tulis isi laporannya saja tanpa judul.`
 
     try {
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
+      const res = await fetch('/api/ai', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-6',
-          max_tokens: 1000,
-          messages: [{ role: 'user', content: prompt }]
-        })
+        body: JSON.stringify({ prompt, maxTokens: 1000 })
       })
       const data = await res.json()
-      const narasi = data.content?.[0]?.text || 'Gagal membuat narasi. Coba lagi.'
-      setLaporan(prev => ({ ...prev, [murid.id]: { narasi, loading: false } }))
+      if (data.error) {
+        setLaporan(prev => ({ ...prev, [murid.id]: { narasi: '', loading: false, error: data.error } }))
+      } else {
+        setLaporan(prev => ({ ...prev, [murid.id]: { narasi: data.text, loading: false, error: '' } }))
+      }
     } catch {
-      setLaporan(prev => ({ ...prev, [murid.id]: { narasi: 'Gagal terhubung ke AI. Pastikan sudah mengatur API key.', loading: false } }))
+      setLaporan(prev => ({ ...prev, [murid.id]: { narasi: '', loading: false, error: 'Gagal terhubung ke server AI.' } }))
     }
   }
 
@@ -110,7 +106,6 @@ Langsung tulis isi laporannya saja tanpa judul.`
   }
 
   function bagikanWhatsApp(murid, narasi) {
-    const tglSelesai = bab.tanggal_selesai || format(new Date(), 'yyyy-MM-dd')
     const pesan = `*Laporan Perkembangan Belajar*\n*SDN Pasirkaliki I*\n\n*Nama:* ${murid.nama}\n*Kelas:* ${kelas.nama}\n*Mata Pelajaran:* ${bab.mata_pelajaran}\n*Bab ${bab.nomor_bab}:* ${bab.judul_bab}\n\n${narasi}\n\n_Salam hangat,_\n_${profile.nama}_\n_Wali Kelas ${kelas.nama}_`
     const url = `https://wa.me/?text=${encodeURIComponent(pesan)}`
     window.open(url, '_blank')
@@ -133,8 +128,7 @@ Langsung tulis isi laporannya saja tanpa judul.`
         </div>
 
         <div className="px-4 -mt-5 mb-4">
-          <button onClick={buatSemuaLaporan}
-            className="btn-primary w-full py-3 flex items-center justify-center gap-2">
+          <button onClick={buatSemuaLaporan} className="btn-primary w-full py-3 flex items-center justify-center gap-2">
             <Sparkles size={16} /> Buat Laporan Semua Murid dengan AI
           </button>
         </div>
@@ -157,9 +151,8 @@ Langsung tulis isi laporannya saja tanpa judul.`
                         <Sparkles size={12} /> Buat
                       </button>
                     )}
-                    {lap && (
-                      <button onClick={() => setExpandedMurid(isExpanded ? null : m.id)}
-                        className="text-gray-400 hover:text-gray-600">
+                    {lap && (lap.narasi || lap.error) && (
+                      <button onClick={() => setExpandedMurid(isExpanded ? null : m.id)} className="text-gray-400 hover:text-gray-600">
                         {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
                       </button>
                     )}
@@ -170,6 +163,13 @@ Langsung tulis isi laporannya saja tanpa judul.`
                   <div className="mt-3 flex items-center gap-2 text-navy-600 text-xs">
                     <Loader size={14} className="animate-spin" />
                     <span>AI sedang menulis narasi...</span>
+                  </div>
+                )}
+
+                {lap?.error && isExpanded && (
+                  <div className="mt-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-lg px-3 py-2">
+                    {lap.error}
+                    <button onClick={() => buatLaporanSatuMurid(m)} className="block mt-1 text-navy-600 font-semibold underline">Coba lagi</button>
                   </div>
                 )}
 
@@ -196,8 +196,7 @@ Langsung tulis isi laporannya saja tanpa judul.`
                         <Share2 size={12} /> Kirim WA
                       </button>
                     </div>
-                    <button onClick={() => buatLaporanSatuMurid(m)}
-                      className="w-full mt-2 text-xs py-1.5 rounded-lg text-navy-600 font-medium">
+                    <button onClick={() => buatLaporanSatuMurid(m)} className="w-full mt-2 text-xs py-1.5 rounded-lg text-navy-600 font-medium">
                       ↻ Buat ulang narasi
                     </button>
                   </div>
