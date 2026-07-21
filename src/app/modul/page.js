@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import Navbar from '@/components/Navbar'
-import { Plus, X, Upload, FileText, Download, BookOpen } from 'lucide-react'
+import { Plus, X, Upload, FileText, Download, BookOpen, Sparkles } from 'lucide-react'
 
 const MAPEL = ['Pendidikan Agama','PPKn','Bahasa Indonesia','Matematika','IPAS','PJOK','Seni Budaya','Bahasa Inggris','Muatan Lokal']
 
@@ -43,7 +43,6 @@ export default function ModulPage() {
     setModul(data || [])
   }
 
-  // Ketika jumlah bagian berubah, sesuaikan jumlah slot upload
   function handleJumlahBagianChange(val) {
     setJumlahBagian(val)
     const n = Math.max(1, parseInt(val) || 1)
@@ -64,11 +63,8 @@ export default function ModulPage() {
   }
 
   function resetForm() {
-    setJudul('')
-    setMataPelajaran('Matematika')
-    setTingkat('')
-    setJumlahBagian('1')
-    setBagianList([{ file: null, deskripsi: '' }])
+    setJudul(''); setMataPelajaran('Matematika'); setTingkat('')
+    setJumlahBagian('1'); setBagianList([{ file: null, deskripsi: '' }])
   }
 
   async function handleUpload() {
@@ -82,18 +78,15 @@ export default function ModulPage() {
     for (let i = 0; i < bagianList.length; i++) {
       const bagian = bagianList[i]
       if (!bagian.file) continue
-
       setUploadProgress(`Mengupload bagian ${i + 1} dari ${bagianList.length}...`)
       const ext = bagian.file.name.split('.').pop()
       const fileName = `${Date.now()}_${judul.replace(/\s+/g,'_')}_bagian${i + 1}.${ext}`
       const { error: uploadError } = await supabase.storage.from('modul-ajar').upload(fileName, bagian.file)
-
       let fileUrl = null
       if (!uploadError) {
         const { data: urlData } = supabase.storage.from('modul-ajar').getPublicUrl(fileName)
         fileUrl = urlData.publicUrl
       }
-
       await supabase.from('modul_ajar').insert({
         judul: bagianList.length > 1 ? `${judul} - Bagian ${i + 1}` : judul,
         mata_pelajaran: mataPelajaran,
@@ -150,7 +143,6 @@ export default function ModulPage() {
           </div>
         </div>
 
-        {/* Form upload */}
         {showForm && (
           <div className="fixed inset-0 bg-black/50 z-50 flex items-end">
             <div className="bg-white w-full rounded-t-2xl p-5 space-y-4 max-h-[90vh] overflow-y-auto">
@@ -187,7 +179,6 @@ export default function ModulPage() {
                 <p className="text-xs text-gray-400 mt-1">Isi jumlah bagian/file yang akan diupload sekaligus</p>
               </div>
 
-              {/* Slot upload dinamis */}
               <div className="space-y-3">
                 {bagianList.map((bagian, idx) => (
                   <div key={idx} className="bg-gray-50 rounded-xl p-3 border border-gray-100">
@@ -233,7 +224,7 @@ export default function ModulPage() {
                 <p className="text-xs text-gray-400">{m.mata_pelajaran}{m.tingkat ? ` · Kelas ${m.tingkat}` : ''}</p>
                 <p className="text-sm font-bold text-gray-800">{m.judul}</p>
                 {m.deskripsi && <p className="text-xs text-gray-400 mt-1">{m.deskripsi}</p>}
-                <div className="flex gap-3 mt-2">
+                <div className="flex gap-3 mt-2 flex-wrap">
                   {m.file_url && (
                     <>
                       <button onClick={() => router.push(`/modul/${m.id}/baca`)}
