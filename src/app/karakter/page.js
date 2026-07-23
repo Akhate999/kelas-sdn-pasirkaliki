@@ -5,7 +5,9 @@ import { supabase } from '@/lib/supabase'
 import Navbar from '@/components/Navbar'
 import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
-import { Plus, X, Save, ListChecks } from 'lucide-react'
+import { Plus, X, Save, ListChecks, AlertTriangle } from 'lucide-react'
+
+const AMBANG_BATAS_PANGGIL_ORTU = 100
 
 const KATEGORI = [
   { value: 'beriman', label: 'Beriman, Bertakwa & Berakhlak Mulia' },
@@ -58,11 +60,17 @@ export default function KarakterPage() {
     load()
   }, [router])
 
+  const [semuaCatatanPoin, setSemuaCatatanPoin] = useState([])
+
   async function loadCatatan(kelasId) {
     const { data } = await supabase.from('catatan_karakter')
       .select('*, murid(nama)').eq('kelas_id', kelasId)
       .order('tanggal', { ascending: false }).limit(50)
     setCatatan(data || [])
+    // Ambil semua data poin (tanpa limit) khusus untuk hitung ambang batas
+    const { data: semuaPoin } = await supabase.from('catatan_karakter')
+      .select('murid_id, poin').eq('kelas_id', kelasId).lt('poin', 0)
+    setSemuaCatatanPoin(semuaPoin || [])
   }
 
   function pilihAturan(aturanId) {
@@ -96,6 +104,16 @@ export default function KarakterPage() {
 
   const filtered = filterDimensi === 'Semua' ? catatan : catatan.filter(c => c.kategori === filterDimensi)
 
+  // Hitung total poin pelanggaran per murid (untuk peringatan panggil orang tua)
+  const totalPelanggaranPerMurid = {}
+  semuaCatatanPoin.forEach(c => {
+    totalPelanggaranPerMurid[c.murid_id] = (totalPelanggaranPerMurid[c.murid_id] || 0) + Math.abs(c.poin)
+  })
+  const muridMelewatiAmbangBatas = Object.entries(totalPelanggaranPerMurid)
+    .filter(([, total]) => total >= AMBANG_BATAS_PANGGIL_ORTU)
+    .map(([muridId, total]) => ({ murid: muridList.find(m => m.id === muridId), total }))
+    .filter(x => x.murid)
+
   if (loading) return <div className="min-h-screen flex items-center justify-center"><p className="text-gray-400 text-sm">Memuat...</p></div>
 
   return (
@@ -115,6 +133,19 @@ export default function KarakterPage() {
             <div className="bg-orange-50 border border-orange-100 rounded-xl px-4 py-2.5 flex items-center gap-2">
               <ListChecks size={16} className="text-orange-500 flex-shrink-0" />
               <p className="text-xs text-orange-700">Belum ada Aturan Kelas. <button onClick={() => router.push('/aturan-kelas')} className="underline font-semibold">Buat dulu</button> supaya pencatatan lebih cepat & konsisten.</p>
+            </div>
+          )}
+          {muridMelewatiAmbangBatas.length > 0 && (
+            <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+              <div className="flex items-center gap-2 mb-1">
+                <AlertTriangle size={16} className="text-red-500 flex-shrink-0" />
+                <p className="text-red-800 text-xs font-semibold">Perlu Pemanggilan Orang Tua</p>
+              </div>
+              <div className="space-y-0.5">
+                {muridMelewatiAmbangBatas.map(({ murid, total }) => (
+                  <p key={murid.id} className="text-red-700 text-xs">• {murid.nama} — {total} poin pelanggaran</p>
+                ))}
+              </div>
             </div>
           )}
         </div>
