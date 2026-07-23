@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase'
 import Navbar from '@/components/Navbar'
 import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
-import { Plus, X, Save } from 'lucide-react'
+import { Plus, X, Save, ListChecks } from 'lucide-react'
 
 const KATEGORI = [
   { value: 'beriman', label: 'Beriman, Bertakwa & Berakhlak Mulia' },
@@ -16,16 +16,11 @@ const KATEGORI = [
   { value: 'kreatif', label: 'Kreatif' },
 ]
 const KATEGORI_COLOR = {
-  beriman: 'bg-purple-100 text-purple-700',
-  kebinekaan: 'bg-blue-100 text-blue-700',
-  gotong_royong: 'bg-green-100 text-green-700',
-  mandiri: 'bg-orange-100 text-orange-700',
-  bernalar_kritis: 'bg-cyan-100 text-cyan-700',
-  kreatif: 'bg-pink-100 text-pink-700',
+  beriman: 'bg-purple-100 text-purple-700', kebinekaan: 'bg-blue-100 text-blue-700',
+  gotong_royong: 'bg-green-100 text-green-700', mandiri: 'bg-orange-100 text-orange-700',
+  bernalar_kritis: 'bg-cyan-100 text-cyan-700', kreatif: 'bg-pink-100 text-pink-700',
 }
-function labelKategori(val) {
-  return KATEGORI.find(k => k.value === val)?.label || val
-}
+function labelKategori(val) { return KATEGORI.find(k => k.value === val)?.label || val }
 
 export default function KarakterPage() {
   const router = useRouter()
@@ -33,13 +28,14 @@ export default function KarakterPage() {
   const [kelas, setKelas]       = useState(null)
   const [muridList, setMuridList] = useState([])
   const [catatan, setCatatan]   = useState([])
+  const [aturanList, setAturanList] = useState([])
   const [showForm, setShowForm] = useState(false)
   const [loading, setLoading]   = useState(true)
   const [saving, setSaving]     = useState(false)
   const [filterDimensi, setFilterDimensi] = useState('Semua')
   const [form, setForm] = useState({
     murid_id: '', tanggal: format(new Date(), 'yyyy-MM-dd'),
-    kategori: 'beriman', catatan: ''
+    kategori: 'beriman', catatan: '', aturan_id: '', poin: null
   })
 
   useEffect(() => {
@@ -54,6 +50,8 @@ export default function KarakterPage() {
         const { data: murid } = await supabase.from('murid').select('*').eq('kelas_id', kls.id).order('nama')
         setMuridList(murid || [])
         loadCatatan(kls.id)
+        const { data: aturan } = await supabase.from('aturan_kelas').select('*').eq('kelas_id', kls.id).order('judul')
+        setAturanList(aturan || [])
       }
       setLoading(false)
     }
@@ -67,13 +65,27 @@ export default function KarakterPage() {
     setCatatan(data || [])
   }
 
+  function pilihAturan(aturanId) {
+    if (!aturanId) {
+      setForm(p => ({ ...p, aturan_id: '', poin: null }))
+      return
+    }
+    const aturan = aturanList.find(a => a.id === aturanId)
+    if (aturan) {
+      setForm(p => ({ ...p, aturan_id: aturanId, kategori: aturan.kategori, catatan: aturan.judul, poin: aturan.poin }))
+    }
+  }
+
   async function handleSave() {
     if (!form.murid_id || !form.catatan.trim()) return
     setSaving(true)
-    await supabase.from('catatan_karakter').insert({ ...form, kelas_id: kelas.id })
+    await supabase.from('catatan_karakter').insert({
+      murid_id: form.murid_id, kelas_id: kelas.id, tanggal: form.tanggal,
+      kategori: form.kategori, catatan: form.catatan, aturan_id: form.aturan_id || null, poin: form.poin
+    })
     setSaving(false)
     setShowForm(false)
-    setForm({ murid_id: '', tanggal: format(new Date(), 'yyyy-MM-dd'), kategori: 'beriman', catatan: '' })
+    setForm({ murid_id: '', tanggal: format(new Date(), 'yyyy-MM-dd'), kategori: 'beriman', catatan: '', aturan_id: '', poin: null })
     loadCatatan(kelas.id)
   }
 
@@ -95,25 +107,27 @@ export default function KarakterPage() {
           <p className="text-navy-300 text-xs">{kelas?.nama} · Profil Pelajar Pancasila</p>
         </div>
 
-        <div className="px-4 -mt-5 mb-4">
+        <div className="px-4 -mt-5 mb-4 space-y-2">
           <button onClick={() => setShowForm(true)} className="btn-primary w-full py-3 flex items-center justify-center gap-2">
             <Plus size={16} /> Tambah Catatan
           </button>
+          {aturanList.length === 0 && (
+            <div className="bg-orange-50 border border-orange-100 rounded-xl px-4 py-2.5 flex items-center gap-2">
+              <ListChecks size={16} className="text-orange-500 flex-shrink-0" />
+              <p className="text-xs text-orange-700">Belum ada Aturan Kelas. <button onClick={() => router.push('/aturan-kelas')} className="underline font-semibold">Buat dulu</button> supaya pencatatan lebih cepat & konsisten.</p>
+            </div>
+          )}
         </div>
 
         <div className="px-4 mb-4">
           <div className="flex gap-2 overflow-x-auto pb-1">
             <button onClick={() => setFilterDimensi('Semua')}
               className={`flex-shrink-0 text-xs px-3 py-1.5 rounded-full font-medium transition-colors
-                ${filterDimensi === 'Semua' ? 'bg-navy-700 text-white' : 'bg-white text-gray-600 border border-gray-200'}`}>
-              Semua
-            </button>
+                ${filterDimensi === 'Semua' ? 'bg-navy-700 text-white' : 'bg-white text-gray-600 border border-gray-200'}`}>Semua</button>
             {KATEGORI.map(k => (
               <button key={k.value} onClick={() => setFilterDimensi(k.value)}
                 className={`flex-shrink-0 text-xs px-3 py-1.5 rounded-full font-medium transition-colors
-                  ${filterDimensi === k.value ? 'bg-navy-700 text-white' : 'bg-white text-gray-600 border border-gray-200'}`}>
-                {k.label}
-              </button>
+                  ${filterDimensi === k.value ? 'bg-navy-700 text-white' : 'bg-white text-gray-600 border border-gray-200'}`}>{k.label}</button>
             ))}
           </div>
         </div>
@@ -136,6 +150,22 @@ export default function KarakterPage() {
                 <label className="label">Tanggal</label>
                 <input type="date" className="input" value={form.tanggal} onChange={e => setForm(p => ({ ...p, tanggal: e.target.value }))} />
               </div>
+
+              {aturanList.length > 0 && (
+                <div>
+                  <label className="label">Pilih dari Aturan Kelas (opsional, lebih cepat)</label>
+                  <select className="input" value={form.aturan_id} onChange={e => pilihAturan(e.target.value)}>
+                    <option value="">-- Tulis manual --</option>
+                    {aturanList.map(a => <option key={a.id} value={a.id}>{a.poin > 0 ? '+' : ''}{a.poin} · {a.judul}</option>)}
+                  </select>
+                  {form.poin !== null && (
+                    <p className={`text-xs mt-1 font-semibold ${form.poin > 0 ? 'text-green-600' : 'text-red-500'}`}>
+                      {form.poin > 0 ? '+' : ''}{form.poin} poin akan ditambahkan
+                    </p>
+                  )}
+                </div>
+              )}
+
               <div>
                 <label className="label">Dimensi Profil Pelajar Pancasila</label>
                 <select className="input" value={form.kategori} onChange={e => setForm(p => ({ ...p, kategori: e.target.value }))}>
@@ -146,11 +176,10 @@ export default function KarakterPage() {
                 <label className="label">Catatan Kejadian</label>
                 <textarea
                   className="input h-24 resize-none"
-                  placeholder="Tuliskan kejadian spesifik yang diamati (bukan kesimpulan/label)..."
+                  placeholder="Tuliskan kejadian spesifik yang diamati..."
                   value={form.catatan}
                   onChange={e => setForm(p => ({ ...p, catatan: e.target.value }))}
                 />
-                <p className="text-xs text-gray-400 mt-1">Contoh: &quot;Membantu teman mengerjakan tugas kelompok tanpa diminta&quot;</p>
               </div>
               <button onClick={handleSave} disabled={saving} className="btn-primary w-full py-3 flex items-center justify-center gap-2 disabled:opacity-60">
                 <Save size={16} /> {saving ? 'Menyimpan...' : 'Simpan Catatan'}
@@ -163,7 +192,6 @@ export default function KarakterPage() {
           {filtered.length === 0 && (
             <div className="card text-center py-8">
               <p className="text-gray-400 text-sm">Belum ada catatan karakter.</p>
-              <p className="text-gray-300 text-xs mt-1">Tekan tombol di atas untuk menambahkan.</p>
             </div>
           )}
           {filtered.map(c => (
@@ -172,18 +200,17 @@ export default function KarakterPage() {
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1 flex-wrap">
                     <p className="text-sm font-bold text-gray-800">{c.murid?.nama}</p>
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${KATEGORI_COLOR[c.kategori]}`}>
-                      {labelKategori(c.kategori)}
-                    </span>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${KATEGORI_COLOR[c.kategori]}`}>{labelKategori(c.kategori)}</span>
+                    {c.poin !== null && c.poin !== undefined && (
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${c.poin > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                        {c.poin > 0 ? '+' : ''}{c.poin}
+                      </span>
+                    )}
                   </div>
-                  <p className="text-xs text-gray-500 mb-2">
-                    {format(new Date(c.tanggal + 'T00:00:00'), 'd MMMM yyyy', { locale: id })}
-                  </p>
+                  <p className="text-xs text-gray-500 mb-2">{format(new Date(c.tanggal + 'T00:00:00'), 'd MMMM yyyy', { locale: id })}</p>
                   <p className="text-sm text-gray-700">{c.catatan}</p>
                 </div>
-                <button onClick={() => handleDelete(c.id)} className="ml-3 text-gray-300 hover:text-red-400 transition-colors flex-shrink-0">
-                  <X size={16} />
-                </button>
+                <button onClick={() => handleDelete(c.id)} className="ml-3 text-gray-300 hover:text-red-400 transition-colors flex-shrink-0"><X size={16} /></button>
               </div>
             </div>
           ))}
