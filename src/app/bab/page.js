@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase'
 import Navbar from '@/components/Navbar'
 import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
-import { Plus, X, Save, BookOpen, CheckCircle, ChevronRight, FileText } from 'lucide-react'
+import { Plus, X, Save, BookOpen, CheckCircle, ChevronRight, FileText, NotebookPen } from 'lucide-react'
 
 const MAPEL = ['Pendidikan Agama','PPKn','Bahasa Indonesia','Matematika','IPAS','PJOK','Seni Budaya','Bahasa Inggris','Muatan Lokal']
 
@@ -16,6 +16,7 @@ export default function BabPage() {
   const [babList, setBabList]   = useState([])
   const [modulList, setModulList] = useState([])
   const [rppList, setRppList]     = useState([])
+  const [kerangkaList, setKerangkaList] = useState([])
   const [showForm, setShowForm] = useState(false)
   const [loading, setLoading]   = useState(true)
   const [saving, setSaving]     = useState(false)
@@ -24,7 +25,7 @@ export default function BabPage() {
     mata_pelajaran: 'Matematika', nomor_bab: '1', judul_bab: '',
     tanggal_mulai: format(new Date(), 'yyyy-MM-dd'),
     tanggal_selesai: '', semester: 'Semester 1', tahun_ajaran: '2025/2026',
-    modul_ajar_id: '', rpp_id: ''
+    modul_ajar_id: '', rpp_id: '', kerangka_bab_id: ''
   })
 
   useEffect(() => {
@@ -43,6 +44,8 @@ export default function BabPage() {
       setModulList(modul || [])
       const { data: rpp } = await supabase.from('rpp').select('*').order('mata_pelajaran')
       setRppList(rpp || [])
+      const { data: kerangka } = await supabase.from('modul_bab').select('*').order('mata_pelajaran').order('nomor_bab')
+      setKerangkaList(kerangka || [])
       setLoading(false)
     }
     load()
@@ -56,7 +59,12 @@ export default function BabPage() {
   }
 
   function handleMapelChange(mapel) {
-    setForm(p => ({ ...p, mata_pelajaran: mapel, modul_ajar_id: '', rpp_id: '' }))
+    setForm(p => ({ ...p, mata_pelajaran: mapel, modul_ajar_id: '', rpp_id: '', kerangka_bab_id: '' }))
+  }
+
+  function handleKerangkaPilih(kerangkaId) {
+    const kerangka = kerangkaList.find(k => k.id === kerangkaId)
+    setForm(p => ({ ...p, kerangka_bab_id: kerangkaId, judul_bab: kerangka ? kerangka.judul : p.judul_bab, nomor_bab: kerangka ? String(kerangka.nomor_bab) : p.nomor_bab }))
   }
 
   function handleModulPilih(modulId) {
@@ -82,6 +90,7 @@ export default function BabPage() {
       status: 'berlangsung',
       modul_ajar_id: form.modul_ajar_id || null,
       rpp_id: form.rpp_id || null,
+      kerangka_bab_id: form.kerangka_bab_id || null,
     })
     if (error) {
       alert('Gagal menyimpan: ' + error.message)
@@ -195,6 +204,10 @@ export default function BabPage() {
                     <CheckCircle size={12} /> Tandai Selesai
                   </button>
                 )}
+                <button onClick={() => router.push(`/bab/${b.id}/pertemuan`)}
+                  className="flex-1 text-xs py-2 rounded-lg bg-purple-50 text-purple-700 font-semibold border border-purple-200 flex items-center justify-center gap-1">
+                  <NotebookPen size={12} /> Pertemuan & Refleksi
+                </button>
                 <button onClick={() => router.push(`/bab/${b.id}/rekap`)}
                   className="flex-1 text-xs py-2 rounded-lg bg-navy-50 text-navy-700 font-semibold border border-navy-200 flex items-center justify-center gap-1">
                   <ChevronRight size={12} /> Lihat Rekap
@@ -217,6 +230,15 @@ export default function BabPage() {
               <select className="input" value={form.mata_pelajaran} onChange={e => handleMapelChange(e.target.value)}>
                 {MAPEL.map(m => <option key={m} value={m}>{m}</option>)}
               </select>
+            </div>
+
+            <div>
+              <label className="label">Pilih Kerangka Bab (opsional, disarankan)</label>
+              <select className="input" value={form.kerangka_bab_id} onChange={e => handleKerangkaPilih(e.target.value)}>
+                <option value="">-- Tidak pakai kerangka --</option>
+                {kerangkaList.filter(k => k.mata_pelajaran === form.mata_pelajaran).map(k => <option key={k.id} value={k.id}>Bab {k.nomor_bab}: {k.judul}</option>)}
+              </select>
+              <p className="text-xs text-gray-400 mt-1">Pilih ini supaya sub-bab otomatis tersedia saat mencatat pertemuan & refleksi</p>
             </div>
 
             <div>
