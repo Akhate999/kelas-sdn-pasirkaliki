@@ -12,9 +12,9 @@ function getFase(tingkat) {
   if (tingkat <= 4) return 'B'
   return 'C'
 }
-function adaLkpd(teks) {
+function adaIsi(teks) {
   if (!teks) return false
-  return !/tidak ada lkpd/i.test(teks.trim())
+  return !/tidak ada|tidak tersedia/i.test(teks.trim().slice(0, 40))
 }
 
 function RPPContent() {
@@ -45,9 +45,13 @@ function RPPContent() {
   const [aiKondisi, setAiKondisi] = useState('')
   const [aiLoading, setAiLoading] = useState(false)
   const [aiHasilRpp, setAiHasilRpp] = useState('')
+  const [aiHasilBahanAjar, setAiHasilBahanAjar] = useState('')
+  const [aiHasilMedia, setAiHasilMedia] = useState('')
   const [aiHasilLkpd, setAiHasilLkpd] = useState('')
+  const [aiHasilEvaluasi, setAiHasilEvaluasi] = useState('')
   const [aiSaving, setAiSaving] = useState(false)
   const [aiError, setAiError] = useState('')
+  const [previewTab, setPreviewTab] = useState('rpp')
 
   useEffect(() => {
     async function load() {
@@ -93,7 +97,8 @@ function RPPContent() {
   }
   function resetAiForm() {
     setAiKerangkaId(''); setAiSubBabIdx(''); setAiTujuan(''); setAiKondisi('')
-    setAiHasilRpp(''); setAiHasilLkpd(''); setAiError('')
+    setAiHasilRpp(''); setAiHasilBahanAjar(''); setAiHasilMedia(''); setAiHasilLkpd(''); setAiHasilEvaluasi('')
+    setAiError(''); setPreviewTab('rpp')
   }
 
   async function handleUploadRpp() {
@@ -128,7 +133,8 @@ function RPPContent() {
     if (!kerangka) { alert('Pilih Kerangka Bab terlebih dahulu.'); return }
     if (aiSubBabIdx === '') { alert('Pilih Sub-Bab yang akan dibuatkan RPP.'); return }
     const subBab = kerangka.sub_bab[parseInt(aiSubBabIdx)]
-    setAiLoading(true); setAiError(''); setAiHasilRpp(''); setAiHasilLkpd('')
+    setAiLoading(true); setAiError('')
+    setAiHasilRpp(''); setAiHasilBahanAjar(''); setAiHasilMedia(''); setAiHasilLkpd(''); setAiHasilEvaluasi('')
 
     const fase = getFase(kerangka.tingkat)
     const romawi = ROMAWI[kerangka.tingkat] || kerangka.tingkat
@@ -136,7 +142,7 @@ function RPPContent() {
     const totalSubBab = kerangka.sub_bab.length
     const nomorPertemuan = parseInt(aiSubBabIdx) + 1
 
-    const prompt = `Kamu adalah ahli pendidikan yang membantu guru SD menyusun Perencanaan Pembelajaran Mendalam (PPM) sesuai kurikulum terbaru.
+    const prompt = `Kamu adalah ahli pendidikan yang membantu guru SD menyusun Modul Ajar/PPM (Perencanaan Pembelajaran Mendalam) LENGKAP beserta lampirannya, sesuai kurikulum terbaru.
 
 Berikut kerangka Bab yang menjadi acuan:
 - Mata Pelajaran: ${kerangka.mata_pelajaran}
@@ -146,81 +152,114 @@ Berikut kerangka Bab yang menjadi acuan:
 - Tujuan Pembelajaran (keseluruhan bab): ${kerangka.tujuan_pembelajaran}
 - Kerangka Pembelajaran (alur bab): ${kerangka.kerangka_pembelajaran || '-'}
 
-PPM ini KHUSUS untuk satu sub-bab berikut (fokuskan seluruh isi di sini, jangan bahas sub-bab lain):
+Modul ini KHUSUS untuk satu sub-bab berikut (fokuskan seluruh isi di sini):
 - Sub-Bab: ${subBab.judul}
 - Ringkasan Materi Sub-Bab: ${subBab.ringkasan || '(gunakan judul sub-bab dan tujuan keseluruhan bab sebagai acuan)'}
 
-Gunakan identitas berikut PERSIS seperti ini (jangan diubah/dikarang):
+Gunakan identitas berikut PERSIS (jangan diubah/dikarang):
 - Penyusun: ${profile?.nama || '-'}
 - Instansi: SDN Pasirkaliki I
 - Tahun Penyusunan: ${tahunSekarang}
 - Jenjang Sekolah: SD
 - Fase / Kelas / Bab: ${fase} / ${romawi} (Kelas ${kerangka.tingkat}) / Bab ${kerangka.nomor_bab} (${kerangka.judul})
 - Pertemuan: ${nomorPertemuan} dari ${totalSubBab}
-- Semester: (tentukan Ganjil atau Genap sesuai konteks umum)
-- Alokasi Waktu: (tentukan yang wajar, misal 2 x 35 menit / 1 pertemuan)
+- Semester: (tentukan Ganjil/Genap sesuai konteks umum)
+- Alokasi Waktu: (tentukan wajar, misal 2 x 35 menit)
 
-Susun PPM lengkap dengan struktur PERSIS seperti berikut (gunakan judul bagian ini apa adanya, boleh pakai heading markdown):
+===== BAGIAN 1: ISI MODUL AJAR =====
+Susun dengan struktur PERSIS berikut:
 
-1. IDENTITAS PPM
-(tampilkan semua identitas di atas dalam format rapi)
+1. IDENTITAS MODUL (tampilkan semua identitas di atas)
 
 2. IDENTIFIKASI
 a. Peserta Didik: (Pengetahuan Dasar, Tingkat Kesiapan sesuai usia kelas ${kerangka.tingkat} SD)
-b. Materi Pembelajaran: (Pengetahuan yang Akan Dicapai, Tingkat Kesulitan, unsur Kolaborasi, Kreativitas, Penalaran Kritis \u2014 sesuaikan dengan sub-bab ini)
-c. Dimensi Profil Lulusan: (pilih 2-3 dimensi paling relevan dari: Beriman Bertakwa dan Berakhlak Mulia, Berkebinekaan Global, Bergotong Royong, Mandiri, Bernalar Kritis, Kreatif \u2014 jelaskan penerapan konkretnya di sub-bab ini)
+b. Materi Pembelajaran: (Pengetahuan yang Akan Dicapai, Tingkat Kesulitan, unsur Kolaborasi, Kreativitas, Penalaran Kritis)
+c. Dimensi Profil Lulusan: (pilih 2-3 dimensi paling relevan dari: Beriman Bertakwa dan Berakhlak Mulia, Berkebinekaan Global, Bergotong Royong, Mandiri, Bernalar Kritis, Kreatif — jelaskan penerapan konkretnya)
 
-3. DESAIN PEMBELAJARAN
+3. KOMPONEN INTI
 a. Capaian Pembelajaran
-b. Lintas Disiplin Ilmu
-c. Tujuan Pembelajaran
-d. Tujuan Pembelajaran Harian
-e. Topik Pembelajaran
-f. Praktik Pedagogis
-g. Kemitraan Pembelajaran
-h. Lingkungan Pembelajaran
-i. Pemanfaatan Digital
+b. Kriteria Ketercapaian Tujuan Pembelajaran (KKTP): tulis sebagai daftar bernomor "KKTP 1", "KKTP 2", dst (buat 3-4 poin terukur, ini akan dirujuk di seluruh lampiran, jadi harus jelas dan spesifik)
+c. Pemahaman Bermakna
+d. Pertanyaan Pemantik
 
-4. PENGALAMAN BELAJAR
-A. Awal (tentukan durasi menit): langkah-langkah detail dan konkret
-B. Inti (tentukan durasi menit): langkah-langkah detail, boleh dibagi beberapa bagian sesuai materi sub-bab, sertakan metode/media yang cocok untuk anak SD (visual, gerak, kelompok)
-C. Penutup (tentukan durasi menit): langkah-langkah detail
+4. KEGIATAN PEMBELAJARAN
+Kegiatan Pembuka (tentukan durasi): langkah-langkah detail dan konkret
+Kegiatan Inti (tentukan durasi): langkah-langkah detail, boleh dibagi beberapa bagian, sertakan metode/media yang cocok untuk anak SD (visual, gerak, kelompok), harus mengarah pada pencapaian setiap KKTP
+Kegiatan Penutup (tentukan durasi): langkah-langkah detail, termasuk refleksi pendidik dan refleksi murid (masing-masing 2-3 pertanyaan)
 
-5. ASESMEN PEMBELAJARAN
-A. Asesmen pada Awal Pembelajaran
-B. Asesmen pada Proses Pembelajaran
-C. Asesmen pada Akhir Pembelajaran
+5. ASESMEN
+Sebutkan jenis asesmen formatif yang dipakai (observasi sikap, penilaian keterampilan, penilaian pengetahuan) sesuai KKTP di atas
 
-6. RUBRIK PENILAIAN FORMATIF
-a. Identitas Pembelajaran (nama aktivitas yang dinilai)
-b. Indikator Penilaian
-c. Aktivitas Asesmen
+6. KEGIATAN PENGAYAAN DAN REMEDIAL
+Pengayaan untuk murid yang sudah menguasai KKTP; Remedial untuk murid yang belum
 
 ${aiTujuan ? `Catatan tambahan dari guru: ${aiTujuan}` : ''}
-${aiKondisi ? `Kondisi kelas yang perlu dipertimbangkan: ${aiKondisi}. Sesuaikan strategi pembelajaran untuk mengatasi kondisi ini.` : ''}
+${aiKondisi ? `Kondisi kelas yang perlu dipertimbangkan: ${aiKondisi}. Sesuaikan strategi pembelajaran.` : ''}
 
-PENTING \u2014 setelah selesai menulis seluruh PPM di atas, tambahkan baris pemisah PERSIS: ===LKPD===
-Lalu, JIKA pembelajaran ini memiliki tugas tertulis untuk siswa, buatkan LKPD (Lembar Kerja Peserta Didik) SATU HALAMAN PENUH dengan format:
-- Judul LKPD
-- Kolom Nama, Kelas, Tanggal (untuk diisi siswa)
-- Petunjuk pengerjaan yang jelas dan sesuai usia anak kelas ${kerangka.tingkat} SD
-- Soal/tugas dengan ruang jawaban yang cukup (gunakan garis "____________" untuk tempat menulis jika perlu)
-Jika TIDAK ada tugas tertulis (misalnya aktivitasnya hanya diskusi/permainan lisan), tulis PERSIS: "Tidak ada LKPD tertulis untuk sub-bab ini."
+===== BAGIAN 2: LAMPIRAN (WAJIB DIBUAT SEMUA, gunakan KKTP yang sama persis dari Bagian 1) =====
 
-Gunakan bahasa Indonesia yang jelas, praktis, dan siap pakai untuk guru SD.`
+Setelah selesai menulis BAGIAN 1 di atas, tambahkan baris pemisah PERSIS ini lalu lanjutkan tiap lampiran dengan pemisahnya masing-masing:
+
+===LAMPIRAN_BAHAN_AJAR===
+Tulis "Lampiran 1. Bahan Ajar – [topik sub-bab]" lalu:
+- Salin ulang: Capaian Pembelajaran, Tujuan Pembelajaran, KKTP (dari Bagian 1)
+- Uraian Materi: susun dengan heading A, B, C, dst — SATU heading per KKTP, isi dengan materi SUNGGUHAN yang bisa langsung dibaca murid/guru (bukan placeholder, tulis penjelasan konsep yang benar dan sesuai usia anak kelas ${kerangka.tingkat} SD, boleh pakai tabel/contoh konkret bila membantu)
+- Rangkuman: 1 paragraf inti materi
+
+===LAMPIRAN_MEDIA===
+Tulis "Lampiran 2. Media" lalu:
+- Salin ulang: Capaian Pembelajaran, Tujuan Pembelajaran, KKTP
+- Untuk SETIAP KKTP, sarankan jenis media yang cocok (contoh: "video animasi tentang...", "gambar diagram...", "alat peraga fisik berupa...") beserta 1 kalimat alasan kenapa cocok, dan sertakan 2-3 kata kunci pencarian yang bisa dipakai guru untuk mencari media tersebut sendiri di internet/YouTube. JANGAN membuat/mengarang URL/tautan asli.
+
+===LAMPIRAN_LKPD===
+Tulis "Lampiran 3. Lembar Kerja Peserta Didik (LKPD)" lalu buat lembar kerja siap cetak:
+- Kolom Nama, Kelas, Tanggal
+- Petunjuk pengerjaan sesuai usia anak kelas ${kerangka.tingkat} SD
+- Untuk SETIAP KKTP, buat satu bagian soal/tugas dengan ruang jawaban cukup (gunakan garis "____________" bila perlu tempat menulis)
+Jika sub-bab ini tidak memerlukan tugas tertulis, tulis PERSIS: "Tidak ada LKPD tertulis untuk sub-bab ini."
+
+===LAMPIRAN_EVALUASI===
+Tulis "Lampiran 4. Evaluasi" lalu buat lengkap:
+- Rubrik Penilaian Sikap: tabel dengan kolom Aspek | 4-Sangat Baik | 3-Baik | 2-Cukup | 1-Perlu Bimbingan. Aspek disesuaikan dengan Dimensi Profil Lulusan yang dipilih di Bagian 1.
+- Rubrik Penilaian Keterampilan: tabel serupa, aspek sesuai aktivitas KKTP di atas.
+- Kisi-kisi Soal: tabel dengan kolom No | KKTP | Indikator Soal | Level Kognitif (C1-C6) | Bentuk Soal | Tingkat Kesukaran. Buat minimal 1 baris per KKTP, indikator soal ditulis dengan format "Disajikan .../murid dapat ..." (jangan pakai kata "dapat/bisa/mampu" di awal kalimat indikator).
+- Instrumen Soal: tulis soal-soal sungguhan sesuai kisi-kisi di atas (pilihan ganda/isian/esai sesuai bentuk soal), diurutkan mudah-sedang-sukar.
+- Kunci Jawaban: jawaban benar untuk setiap soal di atas.
+- Pedoman Penskoran: rumus nilai = (skor perolehan ÷ skor maksimal) × 100, kriteria 86-100 Sangat Baik, 76-85 Baik, 66-75 Cukup, <66 Perlu Bimbingan, dan ketentuan ketuntasan minimal.
+
+Gunakan bahasa Indonesia yang jelas, praktis, dan siap pakai untuk guru SD. Semua konten harus konkret dan sungguhan, tidak boleh ada placeholder seperti "aaaa" atau "isi di sini".`
 
     try {
       const res = await fetch('/api/ai', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt, maxTokens: 3500 })
+        body: JSON.stringify({ prompt, maxTokens: 7000 })
       })
       const data = await res.json()
       if (data.error) {
         setAiError(data.error)
       } else {
-        const parts = data.text.split(/===LKPD===/i)
-        setAiHasilRpp((parts[0] || '').trim())
-        setAiHasilLkpd((parts[1] || '').trim())
+        const bagianRpp = data.text.split(/===LAMPIRAN_BAHAN_AJAR===/i)
+        const rppText = (bagianRpp[0] || '').trim()
+        const sisaSetelahRpp = bagianRpp[1] || ''
+
+        const bagianBahanAjar = sisaSetelahRpp.split(/===LAMPIRAN_MEDIA===/i)
+        const bahanAjarText = (bagianBahanAjar[0] || '').trim()
+        const sisaSetelahBahanAjar = bagianBahanAjar[1] || ''
+
+        const bagianMedia = sisaSetelahBahanAjar.split(/===LAMPIRAN_LKPD===/i)
+        const mediaText = (bagianMedia[0] || '').trim()
+        const sisaSetelahMedia = bagianMedia[1] || ''
+
+        const bagianLkpd = sisaSetelahMedia.split(/===LAMPIRAN_EVALUASI===/i)
+        const lkpdText = (bagianLkpd[0] || '').trim()
+        const evaluasiText = (bagianLkpd[1] || '').trim()
+
+        setAiHasilRpp(rppText)
+        setAiHasilBahanAjar(bahanAjarText)
+        setAiHasilMedia(mediaText)
+        setAiHasilLkpd(lkpdText)
+        setAiHasilEvaluasi(evaluasiText)
+        setPreviewTab('rpp')
       }
     } catch { setAiError('Gagal terhubung ke server AI. Coba lagi.') }
     setAiLoading(false)
@@ -234,27 +273,26 @@ Gunakan bahasa Indonesia yang jelas, praktis, dan siap pakai untuk guru SD.`
     const { data: { user } } = await supabase.auth.getUser()
     await supabase.from('rpp').insert({
       judul: `${kerangka.judul} - ${subBab.judul}`, mata_pelajaran: aiMapel, tingkat: kerangka.tingkat,
-      jenis: 'ai', konten_ai: aiHasilRpp, konten_lkpd: aiHasilLkpd, lkpd: [], uploaded_by: user.id,
-      kerangka_bab_id: aiKerangkaId, sub_bab_judul: subBab.judul
+      jenis: 'ai', konten_ai: aiHasilRpp,
+      lampiran_bahan_ajar: aiHasilBahanAjar, lampiran_media: aiHasilMedia,
+      lampiran_lkpd: aiHasilLkpd, lampiran_evaluasi: aiHasilEvaluasi,
+      lkpd: [], uploaded_by: user.id, kerangka_bab_id: aiKerangkaId, sub_bab_judul: subBab.judul
     })
     setAiSaving(false); setMode(null); resetAiForm(); loadRpp()
   }
 
   function cetakRpp(rpp) {
-    const halamanLkpd = adaLkpd(rpp.konten_lkpd) ? `
-      <div class="page-break"></div>
-      <div class="kop-kecil">
-        <img src="/logo-sdn.png"/>
-        <div><div class="nama-kecil">SDN PASIRKALIKI I</div><div class="sub-kecil">Lembar Kerja Peserta Didik</div></div>
-      </div>
-      <div class="lkpd-identitas">
-        <div>Nama: <span class="garis"></span></div>
-        <div>Kelas: <span class="garis"></span></div>
-        <div>Tanggal: <span class="garis"></span></div>
-      </div>
-      <div class="konten">${rpp.konten_lkpd}</div>
-    ` : ''
-
+    function halamanLampiran(judulLampiran, konten) {
+      if (!adaIsi(konten)) return ''
+      return `
+        <div class="page-break"></div>
+        <div class="kop-kecil">
+          <img src="/logo-sdn.png"/>
+          <div><div class="nama-kecil">SDN PASIRKALIKI I</div><div class="sub-kecil">${judulLampiran}</div></div>
+        </div>
+        <div class="konten">${konten}</div>
+      `
+    }
     const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${rpp.judul}</title>
     <style>
       body{font-family:Arial;padding:30px 40px;color:#222;line-height:1.6}
@@ -266,17 +304,18 @@ Gunakan bahasa Indonesia yang jelas, praktis, dan siap pakai untuk guru SD.`
       .kop-kecil{display:flex;align-items:center;gap:12px;border-bottom:2px solid #163a61;padding-bottom:10px;margin-bottom:16px}
       .kop-kecil img{width:44px;height:44px}
       .nama-kecil{font-size:13px;font-weight:bold;color:#163a61}
-      .sub-kecil{font-size:11px;color:#666}
-      .lkpd-identitas{display:flex;gap:24px;font-size:12px;margin-bottom:16px}
-      .garis{display:inline-block;width:140px;border-bottom:1px solid #333;margin-left:4px}
+      .sub-kecil{font-size:12px;color:#666;font-weight:600}
       @media print{.no-print{display:none}}
     </style></head><body>
     <div class="no-print" style="text-align:center;margin-bottom:16px"><button onclick="window.print()" style="background:#163a61;color:white;border:none;padding:10px 24px;border-radius:8px;cursor:pointer">🖨️ Cetak PDF</button></div>
     <div class="kop"><img src="/logo-sdn.png"/><div><div class="nama">SDN PASIRKALIKI I</div></div></div>
-    <h1>PERENCANAAN PEMBELAJARAN MENDALAM (PPM)</h1>
+    <h1>MODUL AJAR / PERENCANAAN PEMBELAJARAN MENDALAM</h1>
     <p class="sub">${rpp.judul} · ${rpp.mata_pelajaran} · Kelas ${rpp.tingkat || '-'}</p>
     <div class="konten">${rpp.konten_ai}</div>
-    ${halamanLkpd}
+    ${halamanLampiran('Lampiran 1. Bahan Ajar', rpp.lampiran_bahan_ajar)}
+    ${halamanLampiran('Lampiran 2. Media', rpp.lampiran_media)}
+    ${halamanLampiran('Lampiran 3. LKPD', rpp.lampiran_lkpd)}
+    ${halamanLampiran('Lampiran 4. Evaluasi', rpp.lampiran_evaluasi)}
     </body></html>`
     const win = window.open('', '_blank'); win.document.write(html); win.document.close()
   }
@@ -291,6 +330,17 @@ Gunakan bahasa Indonesia yang jelas, praktis, dan siap pakai untuk guru SD.`
   const kerangkaUntukMapel = kerangkaList.filter(k => k.mata_pelajaran === aiMapel)
   const kerangkaTerpilih = kerangkaList.find(k => k.id === aiKerangkaId)
 
+  const previewTabs = [
+    ['rpp', 'RPP', aiHasilRpp],
+    ['bahan', 'Bahan Ajar', aiHasilBahanAjar],
+    ['media', 'Media', aiHasilMedia],
+    ['lkpd', 'LKPD', aiHasilLkpd],
+    ['evaluasi', 'Evaluasi', aiHasilEvaluasi],
+  ]
+  const setterMap = {
+    rpp: setAiHasilRpp, bahan: setAiHasilBahanAjar, media: setAiHasilMedia, lkpd: setAiHasilLkpd, evaluasi: setAiHasilEvaluasi
+  }
+
   if (loading) return <div className="min-h-screen flex items-center justify-center"><p className="text-gray-400 text-sm">Memuat...</p></div>
 
   return (
@@ -299,7 +349,7 @@ Gunakan bahasa Indonesia yang jelas, praktis, dan siap pakai untuk guru SD.`
       <main className="pt-14 pb-8">
         <div className="bg-navy-800 px-4 pt-5 pb-8">
           <h2 className="text-white font-bold text-lg">RPP</h2>
-          <p className="text-navy-300 text-xs">Perencanaan Pembelajaran Mendalam</p>
+          <p className="text-navy-300 text-xs">Modul Ajar lengkap dengan 4 Lampiran</p>
         </div>
 
         <div className="px-4 -mt-5 mb-4 grid grid-cols-2 gap-2">
@@ -375,7 +425,7 @@ Gunakan bahasa Indonesia yang jelas, praktis, dan siap pakai untuk guru SD.`
           <div className="fixed inset-0 bg-black/50 z-50 flex items-end">
             <div className="bg-white w-full rounded-t-2xl p-5 space-y-4 max-h-[90vh] overflow-y-auto">
               <div className="flex items-center justify-between">
-                <h3 className="font-bold text-purple-700 flex items-center gap-2"><Sparkles size={18} /> Buat RPP dengan AI</h3>
+                <h3 className="font-bold text-purple-700 flex items-center gap-2"><Sparkles size={18} /> Buat RPP + Lampiran dengan AI</h3>
                 <button onClick={() => { setMode(null); resetAiForm() }}><X size={20} className="text-gray-400" /></button>
               </div>
 
@@ -418,24 +468,30 @@ Gunakan bahasa Indonesia yang jelas, praktis, dan siap pakai untuk guru SD.`
                   {aiError && <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{aiError}</p>}
                   <button onClick={handleBuatAI} disabled={aiLoading || !aiKerangkaId || aiSubBabIdx === ''}
                     className="w-full py-3 flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg disabled:opacity-60">
-                    {aiLoading ? <><Loader size={16} className="animate-spin" /> AI sedang menyusun PPM...</> : <><Sparkles size={16} /> Buat RPP</>}
+                    {aiLoading ? <><Loader size={16} className="animate-spin" /> AI sedang menyusun RPP + 4 Lampiran... (bisa 1-2 menit)</> : <><Sparkles size={16} /> Buat RPP + Lampiran</>}
                   </button>
                 </>
               )}
 
               {aiHasilRpp && (
                 <>
-                  <p className="text-xs font-semibold text-navy-700">Isi RPP</p>
-                  <textarea className="input h-40 text-xs" value={aiHasilRpp} onChange={e => setAiHasilRpp(e.target.value)} />
-                  <p className="text-xs font-semibold text-navy-700">
-                    {adaLkpd(aiHasilLkpd) ? 'LKPD (Lembar Kerja \u2014 dicetak halaman terpisah)' : 'LKPD'}
-                  </p>
-                  <textarea className="input h-32 text-xs" value={aiHasilLkpd} onChange={e => setAiHasilLkpd(e.target.value)} />
+                  <div className="flex gap-1 overflow-x-auto pb-1">
+                    {previewTabs.map(([key, label]) => (
+                      <button key={key} onClick={() => setPreviewTab(key)}
+                        className={`flex-shrink-0 text-xs px-3 py-1.5 rounded-full font-medium
+                          ${previewTab === key ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-600'}`}>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  <textarea className="input h-64 text-xs"
+                    value={previewTabs.find(([k]) => k === previewTab)[2]}
+                    onChange={e => setterMap[previewTab](e.target.value)} />
                   <div className="flex gap-2">
-                    <button onClick={() => { setAiHasilRpp(''); setAiHasilLkpd('') }} className="flex-1 text-xs py-2.5 rounded-lg bg-gray-100 text-gray-700 font-semibold">↻ Buat Ulang</button>
+                    <button onClick={resetAiForm} className="flex-1 text-xs py-2.5 rounded-lg bg-gray-100 text-gray-700 font-semibold">↻ Buat Ulang</button>
                     <button onClick={simpanRppAI} disabled={aiSaving}
                       className="flex-1 text-xs py-2.5 rounded-lg bg-purple-600 text-white font-semibold flex items-center justify-center gap-1 disabled:opacity-60">
-                      <Save size={14} /> {aiSaving ? 'Menyimpan...' : 'Simpan RPP'}
+                      <Save size={14} /> {aiSaving ? 'Menyimpan...' : 'Simpan Semua'}
                     </button>
                   </div>
                 </>
@@ -455,7 +511,11 @@ Gunakan bahasa Indonesia yang jelas, praktis, dan siap pakai untuk guru SD.`
                 <p className="text-xs text-gray-400">{r.mata_pelajaran}{r.tingkat ? ` · Kelas ${r.tingkat}` : ''} · {r.jenis === 'ai' ? 'Dibuat AI' : 'Upload'}</p>
                 <p className="text-sm font-bold text-gray-800">{r.judul}</p>
                 {r.sub_bab_judul && <p className="text-xs text-gray-400 mt-1">Sub-bab: {r.sub_bab_judul}</p>}
-                {adaLkpd(r.konten_lkpd) && <p className="text-xs text-purple-500 mt-1">✓ Dilengkapi LKPD 1 halaman</p>}
+                {r.jenis === 'ai' && (
+                  <p className="text-xs text-purple-500 mt-1">
+                    ✓ {[adaIsi(r.lampiran_bahan_ajar) && 'Bahan Ajar', adaIsi(r.lampiran_media) && 'Media', adaIsi(r.lampiran_lkpd) && 'LKPD', adaIsi(r.lampiran_evaluasi) && 'Evaluasi'].filter(Boolean).join(' · ')}
+                  </p>
+                )}
                 <div className="flex gap-3 mt-2 flex-wrap">
                   {r.file_rpp_url && (
                     <a href={r.file_rpp_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-navy-600 font-semibold hover:underline">
@@ -464,7 +524,7 @@ Gunakan bahasa Indonesia yang jelas, praktis, dan siap pakai untuk guru SD.`
                   )}
                   {r.konten_ai && (
                     <button onClick={() => cetakRpp(r)} className="inline-flex items-center gap-1 text-xs text-purple-600 font-semibold hover:underline">
-                      <Printer size={12} /> Cetak
+                      <Printer size={12} /> Cetak Lengkap
                     </button>
                   )}
                 </div>
