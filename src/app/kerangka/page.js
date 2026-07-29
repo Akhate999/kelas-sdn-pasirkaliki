@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import Navbar from '@/components/Navbar'
-import { Plus, X, Save, BookOpen, Sparkles, ChevronDown, ChevronUp, ListTree } from 'lucide-react'
+import { Plus, X, Save, BookOpen, Sparkles, ChevronDown, ChevronUp, ListTree, FileText } from 'lucide-react'
 
 const MAPEL = ['Pendidikan Agama','PPKn','Bahasa Indonesia','Matematika','IPAS','PJOK','Seni Budaya','Bahasa Inggris','Muatan Lokal']
 
@@ -12,6 +12,7 @@ export default function KerangkaBabPage() {
   const [profile, setProfile] = useState(null)
   const [kelas, setKelas]     = useState(null)
   const [list, setList]       = useState([])
+  const [modulList, setModulList] = useState([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving]   = useState(false)
@@ -20,13 +21,14 @@ export default function KerangkaBabPage() {
 
   const [mapel, setMapel] = useState('Matematika')
   const [tingkat, setTingkat] = useState('3')
+  const [modulAjarId, setModulAjarId] = useState('')
   const [nomorBab, setNomorBab] = useState('1')
   const [judulBab, setJudulBab] = useState('')
   const [latarBelakang, setLatarBelakang] = useState('')
   const [tujuanPembelajaran, setTujuanPembelajaran] = useState('')
   const [kerangkaPembelajaran, setKerangkaPembelajaran] = useState('')
   const [jumlahSubBab, setJumlahSubBab] = useState('1')
-  const [subBabList, setSubBabList] = useState([{ judul: '', ringkasan: '' }])
+  const [subBabList, setSubBabList] = useState([{ judul: '', ringkasan: '', halaman_mulai: '', halaman_selesai: '' }])
 
   useEffect(() => {
     async function load() {
@@ -36,7 +38,9 @@ export default function KerangkaBabPage() {
       setProfile(prof)
       const { data: kls } = await supabase.from('kelas').select('*').eq('wali_kelas_id', prof.id).single()
       setKelas(kls)
-      loadList()
+      if (kls) loadList()
+      const { data: modul } = await supabase.from('modul_ajar').select('*').not('file_url', 'is', null).order('mata_pelajaran').order('urutan')
+      setModulList(modul || [])
       setLoading(false)
     }
     load()
@@ -52,7 +56,7 @@ export default function KerangkaBabPage() {
     const n = Math.max(1, parseInt(val) || 1)
     setSubBabList(prev => {
       const list = [...prev]
-      while (list.length < n) list.push({ judul: '', ringkasan: '' })
+      while (list.length < n) list.push({ judul: '', ringkasan: '', halaman_mulai: '', halaman_selesai: '' })
       while (list.length > n) list.pop()
       return list
     })
@@ -63,26 +67,28 @@ export default function KerangkaBabPage() {
   }
 
   function resetForm() {
-    setMapel('Matematika'); setTingkat('3'); setNomorBab('1'); setJudulBab('')
+    setMapel('Matematika'); setTingkat('3'); setModulAjarId(''); setNomorBab('1'); setJudulBab('')
     setLatarBelakang(''); setTujuanPembelajaran(''); setKerangkaPembelajaran('')
-    setJumlahSubBab('1'); setSubBabList([{ judul: '', ringkasan: '' }])
+    setJumlahSubBab('1'); setSubBabList([{ judul: '', ringkasan: '', halaman_mulai: '', halaman_selesai: '' }])
   }
 
   async function handleSave() {
     if (!judulBab.trim()) { alert('Judul bab harus diisi.'); return }
-    if (!tujuanPembelajaran.trim()) { alert('Tujuan pembelajaran harus diisi \u2014 ini yang paling penting dibaca AI.'); return }
+    if (!tujuanPembelajaran.trim()) { alert('Tujuan pembelajaran harus diisi.'); return }
     setSaving(true)
     const { data: { user } } = await supabase.auth.getUser()
-    const subBabBersih = subBabList.filter(s => s.judul.trim())
+    const subBabBersih = subBabList.filter(s => s.judul.trim()).map(s => ({
+      judul: s.judul, ringkasan: s.ringkasan,
+      halaman_mulai: s.halaman_mulai ? parseInt(s.halaman_mulai) : null,
+      halaman_selesai: s.halaman_selesai ? parseInt(s.halaman_selesai) : null,
+    }))
     await supabase.from('modul_bab').insert({
       mata_pelajaran: mapel, tingkat: parseInt(tingkat), nomor_bab: parseInt(nomorBab) || 1,
       judul: judulBab.trim(), latar_belakang: latarBelakang, tujuan_pembelajaran: tujuanPembelajaran,
-      kerangka_pembelajaran: kerangkaPembelajaran, sub_bab: subBabBersih, uploaded_by: user.id
+      kerangka_pembelajaran: kerangkaPembelajaran, sub_bab: subBabBersih,
+      modul_ajar_id: modulAjarId || null, uploaded_by: user.id
     })
-    setSaving(false)
-    setShowForm(false)
-    resetForm()
-    loadList()
+    setSaving(false); setShowForm(false); resetForm(); loadList()
   }
 
   async function handleDelete(id) {
@@ -92,6 +98,7 @@ export default function KerangkaBabPage() {
   }
 
   const filtered = filterMapel === 'Semua' ? list : list.filter(k => k.mata_pelajaran === filterMapel)
+  const modulUntukMapel = modulList.filter(m => m.mata_pelajaran === mapel)
 
   if (loading) return <div className="min-h-screen flex items-center justify-center"><p className="text-gray-400 text-sm">Memuat...</p></div>
 
@@ -117,9 +124,11 @@ export default function KerangkaBabPage() {
           </div>
         </div>
 
-        <div className="px-4 bg-blue-50 border border-blue-100 rounded-xl mx-4 px-4 py-3 mb-4">
-          <p className="text-blue-800 text-xs font-semibold mb-1">Kenapa perlu diisi?</p>
-          <p className="text-blue-700 text-xs">Kerangka ini yang dibaca AI saat membuat RPP \u2014 bukan file PDF. Isi sekali, bisa dipakai berkali-kali untuk membuat RPP tiap sub-bab.</p>
+        <div className="px-4 mb-4">
+          <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3">
+            <p className="text-blue-800 text-xs font-semibold mb-1">Kenapa perlu diisi?</p>
+            <p className="text-blue-700 text-xs">Kerangka ini dibaca AI saat membuat RPP. Kalau kamu tautkan PDF modul dan tandai halaman tiap sub-bab, AI akan membaca isi buku asli di halaman itu — hasilnya lebih akurat.</p>
+          </div>
         </div>
 
         {showForm && (
@@ -132,11 +141,20 @@ export default function KerangkaBabPage() {
 
               <div className="grid grid-cols-3 gap-3">
                 <div className="col-span-2"><label className="label">Mata Pelajaran</label>
-                  <select className="input" value={mapel} onChange={e => setMapel(e.target.value)}>{MAPEL.map(m => <option key={m} value={m}>{m}</option>)}</select>
+                  <select className="input" value={mapel} onChange={e => { setMapel(e.target.value); setModulAjarId('') }}>{MAPEL.map(m => <option key={m} value={m}>{m}</option>)}</select>
                 </div>
                 <div><label className="label">Kelas</label>
                   <select className="input" value={tingkat} onChange={e => setTingkat(e.target.value)}>{[1,2,3,4,5,6].map(n => <option key={n} value={n}>{n}</option>)}</select>
                 </div>
+              </div>
+
+              <div>
+                <label className="label flex items-center gap-1"><FileText size={13} /> Tautkan PDF Modul Ajar (opsional, disarankan)</label>
+                <select className="input" value={modulAjarId} onChange={e => setModulAjarId(e.target.value)}>
+                  <option value="">-- Tidak tautkan PDF --</option>
+                  {modulUntukMapel.map(m => <option key={m.id} value={m.id}>{m.judul}</option>)}
+                </select>
+                {modulUntukMapel.length === 0 && <p className="text-xs text-orange-500 mt-1">Belum ada modul PDF untuk {mapel}. <button onClick={() => router.push('/modul')} className="underline">Upload dulu</button></p>}
               </div>
 
               <div className="grid grid-cols-3 gap-3">
@@ -154,7 +172,6 @@ export default function KerangkaBabPage() {
 
               <div><label className="label">Tujuan Pembelajaran <span className="text-red-500">*</span></label>
                 <textarea className="input h-24 resize-none" placeholder={"Tulis poin-poin tujuan, contoh:\n1. Murid dapat menjelaskan...\n2. Murid dapat mempraktikkan..."} value={tujuanPembelajaran} onChange={e => setTujuanPembelajaran(e.target.value)} />
-                <p className="text-xs text-gray-400 mt-1">Bagian terpenting yang dibaca AI</p>
               </div>
 
               <div><label className="label">Kerangka Pembelajaran</label>
@@ -170,6 +187,16 @@ export default function KerangkaBabPage() {
                   <p className="text-xs font-semibold text-navy-700">Sub-Bab {idx + 1}</p>
                   <input className="input text-sm" placeholder="Judul sub-bab" value={sb.judul} onChange={e => updateSubBab(idx, 'judul', e.target.value)} />
                   <textarea className="input h-16 resize-none text-sm" placeholder="Ringkasan materi sub-bab ini..." value={sb.ringkasan} onChange={e => updateSubBab(idx, 'ringkasan', e.target.value)} />
+                  {modulAjarId && (
+                    <div className="grid grid-cols-2 gap-2">
+                      <div><label className="text-xs text-gray-500">Halaman Mulai</label>
+                        <input type="number" min="1" className="input text-sm" placeholder="3" value={sb.halaman_mulai} onChange={e => updateSubBab(idx, 'halaman_mulai', e.target.value)} />
+                      </div>
+                      <div><label className="text-xs text-gray-500">Halaman Selesai</label>
+                        <input type="number" min="1" className="input text-sm" placeholder="8" value={sb.halaman_selesai} onChange={e => updateSubBab(idx, 'halaman_selesai', e.target.value)} />
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
 
@@ -195,7 +222,7 @@ export default function KerangkaBabPage() {
                   <div className="flex-1">
                     <p className="text-xs text-gray-400">{k.mata_pelajaran} · Kelas {k.tingkat}</p>
                     <p className="text-sm font-bold text-gray-800">Bab {k.nomor_bab}: {k.judul}</p>
-                    <p className="text-xs text-gray-400 mt-1">{k.sub_bab?.length || 0} sub-bab</p>
+                    <p className="text-xs text-gray-400 mt-1">{k.sub_bab?.length || 0} sub-bab{k.modul_ajar_id ? ' · PDF tertaut' : ''}</p>
                   </div>
                   {isOpen ? <ChevronUp size={16} className="text-gray-400" /> : <ChevronDown size={16} className="text-gray-400" />}
                 </button>
@@ -210,7 +237,11 @@ export default function KerangkaBabPage() {
                       <div>
                         <p className="text-xs font-semibold text-gray-600 mb-1 flex items-center gap-1"><ListTree size={12} /> Sub-Bab</p>
                         <ul className="space-y-1">
-                          {k.sub_bab.map((sb, i) => <li key={i} className="text-xs text-gray-600">• {sb.judul}</li>)}
+                          {k.sub_bab.map((sb, i) => (
+                            <li key={i} className="text-xs text-gray-600">
+                              • {sb.judul}{sb.halaman_mulai ? ` (hal. ${sb.halaman_mulai}-${sb.halaman_selesai || sb.halaman_mulai})` : ''}
+                            </li>
+                          ))}
                         </ul>
                       </div>
                     )}
@@ -219,9 +250,7 @@ export default function KerangkaBabPage() {
                         className="flex-1 text-xs py-2 rounded-lg bg-purple-50 text-purple-700 font-semibold border border-purple-200 flex items-center justify-center gap-1">
                         <Sparkles size={12} /> Buat RPP dari Bab Ini
                       </button>
-                      <button onClick={() => handleDelete(k.id)} className="text-xs py-2 px-3 rounded-lg bg-red-50 text-red-600 font-semibold border border-red-100">
-                        Hapus
-                      </button>
+                      <button onClick={() => handleDelete(k.id)} className="text-xs py-2 px-3 rounded-lg bg-red-50 text-red-600 font-semibold border border-red-100">Hapus</button>
                     </div>
                   </div>
                 )}
