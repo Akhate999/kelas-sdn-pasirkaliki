@@ -16,6 +16,20 @@ function adaIsi(teks) {
   if (!teks) return false
   return !/tidak ada|tidak tersedia/i.test(teks.trim().slice(0, 40))
 }
+async function extractPdfPages(fileUrl, startPage, endPage) {
+  const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf')
+  pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`
+  const doc = await pdfjsLib.getDocument(fileUrl).promise
+  const awal = Math.max(1, startPage || 1)
+  const akhir = Math.min(endPage || doc.numPages, doc.numPages)
+  let text = ''
+  for (let i = awal; i <= akhir; i++) {
+    const page = await doc.getPage(i)
+    const content = await page.getTextContent()
+    text += content.items.map(it => it.str).join(' ') + '\n'
+  }
+  return { text: text.slice(0, 20000), halamanDibaca: akhir - awal + 1, totalPages: doc.numPages }
+}
 
 function RPPContent() {
   const router = useRouter()
@@ -52,6 +66,10 @@ function RPPContent() {
   const [aiSaving, setAiSaving] = useState(false)
   const [aiError, setAiError] = useState('')
   const [previewTab, setPreviewTab] = useState('rpp')
+  const [modulAjarTertaut, setModulAjarTertaut] = useState(null)
+  const [extractStatus, setExtractStatus] = useState('idle')
+  const [extractedText, setExtractedText] = useState('')
+  const [extractInfo, setExtractInfo] = useState(null)
 
   useEffect(() => {
     async function load() {
@@ -78,6 +96,40 @@ function RPPContent() {
     setRppList(data || [])
   }
 
+  // Ambil info modul PDF yang tertaut ke kerangka terpilih
+  useEffect(() => {
+    async function fetchModul() {
+      const kerangka = kerangkaList.find(k => k.id === aiKerangkaId)
+      if (!kerangka?.modul_ajar_id) { setModulAjarTertaut(null); return }
+      const { data } = await supabase.from('modul_ajar').select('*').eq('id', kerangka.modul_ajar_id).single()
+      setModulAjarTertaut(data || null)
+    }
+    fetchModul()
+  }, [aiKerangkaId, kerangkaList])
+
+  // Ekstrak halaman PDF sesuai sub-bab yang dipilih
+  useEffect(() => {
+    if (!modulAjarTertaut?.file_url || aiSubBabIdx === '') {
+      setExtractStatus('idle'); setExtractedText(''); setExtractInfo(null); return
+    }
+    const kerangka = kerangkaList.find(k => k.id === aiKerangkaId)
+    const subBab = kerangka?.sub_bab?.[parseInt(aiSubBabIdx)]
+    if (!subBab?.halaman_mulai) {
+      setExtractStatus('idle'); setExtractedText(''); setExtractInfo(null); return
+    }
+    let cancelled = false
+    setExtractStatus('loading')
+    extractPdfPages(modulAjarTertaut.file_url, subBab.halaman_mulai, subBab.halaman_selesai || subBab.halaman_mulai)
+      .then(result => {
+        if (cancelled) return
+        setExtractedText(result.text)
+        setExtractInfo(result)
+        setExtractStatus('done')
+      })
+      .catch(() => { if (!cancelled) setExtractStatus('error') })
+    return () => { cancelled = true }
+  }, [aiSubBabIdx, modulAjarTertaut, aiKerangkaId, kerangkaList])
+
   function handleJumlahLkpdChange(val) {
     setJumlahLkpd(val)
     const n = Math.max(0, parseInt(val) || 0)
@@ -99,6 +151,7 @@ function RPPContent() {
     setAiKerangkaId(''); setAiSubBabIdx(''); setAiTujuan(''); setAiKondisi('')
     setAiHasilRpp(''); setAiHasilBahanAjar(''); setAiHasilMedia(''); setAiHasilLkpd(''); setAiHasilEvaluasi('')
     setAiError(''); setPreviewTab('rpp')
+    setExtractStatus('idle'); setExtractedText(''); setExtractInfo(null)
   }
 
   async function handleUploadRpp() {
@@ -155,6 +208,10 @@ Berikut kerangka Bab yang menjadi acuan:
 Modul ini KHUSUS untuk satu sub-bab berikut (fokuskan seluruh isi di sini):
 - Sub-Bab: ${subBab.judul}
 - Ringkasan Materi Sub-Bab: ${subBab.ringkasan || '(gunakan judul sub-bab dan tujuan keseluruhan bab sebagai acuan)'}
+${extractStatus === 'done' && extractedText ? `
+Berikut KUTIPAN ISI BUKU ASLI (halaman ${subBab.halaman_mulai}-${subBab.halaman_selesai || subBab.halaman_mulai}) yang HARUS dijadikan acuan UTAMA untuk seluruh isi Modul dan Lampiran (terutama Bahan Ajar) — jangan menyimpang dari materi ini:
+"""${extractedText}"""
+` : ''}
 
 Gunakan identitas berikut PERSIS (jangan diubah/dikarang):
 - Penyusun: ${profile?.nama || '-'}
@@ -459,6 +516,16 @@ Gunakan bahasa Indonesia yang jelas, praktis, dan siap pakai untuk guru SD. Semu
                     </div>
                   )}
 
+                  {aiSubBabIdx !== '' && modulAjarTertaut && (
+                    <div className={`rounded-lg px-3 py-2 text-xs flex items-center gap-2
+                      ${extractStatus === 'loading' ? 'bg-blue-50 text-blue-700' : extractStatus === 'done' ? 'bg-green-50 text-green-700' : extractStatus === 'error' ? 'bg-orange-50 text-orange-700' : 'bg-gray-50 text-gray-500'}`}>
+                      {extractStatus === 'loading' && <><Loader size={14} className="animate-spin" /> Membaca halaman buku...</>}
+                      {extractStatus === 'done' && <>✓ Berhasil membaca {extractInfo?.halamanDibaca} halaman dari buku (dari {extractInfo?.totalPages} total halaman)</>}
+                      {extractStatus === 'error' && <>Gagal membaca PDF, RPP akan dibuat dari ringkasan manual saja</>}
+                      {extractStatus === 'idle' && <>Sub-bab ini belum ditandai rentang halaman — RPP akan dibuat dari ringkasan manual saja. <button onClick={() => router.push('/kerangka')} className="underline">Atur di Kerangka Bab</button></>}
+                    </div>
+                  )}
+
                   <div><label className="label">Tujuan Khusus (opsional)</label>
                     <textarea className="input h-16 resize-none" value={aiTujuan} onChange={e => setAiTujuan(e.target.value)} />
                   </div>
@@ -466,7 +533,7 @@ Gunakan bahasa Indonesia yang jelas, praktis, dan siap pakai untuk guru SD. Semu
                     <textarea className="input h-16 resize-none" value={aiKondisi} onChange={e => setAiKondisi(e.target.value)} />
                   </div>
                   {aiError && <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{aiError}</p>}
-                  <button onClick={handleBuatAI} disabled={aiLoading || !aiKerangkaId || aiSubBabIdx === ''}
+                  <button onClick={handleBuatAI} disabled={aiLoading || !aiKerangkaId || aiSubBabIdx === '' || extractStatus === 'loading'}
                     className="w-full py-3 flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg disabled:opacity-60">
                     {aiLoading ? <><Loader size={16} className="animate-spin" /> AI sedang menyusun RPP + 4 Lampiran... (bisa 1-2 menit)</> : <><Sparkles size={16} /> Buat RPP + Lampiran</>}
                   </button>
