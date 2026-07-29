@@ -3,42 +3,32 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import Navbar from '@/components/Navbar'
-import { format } from 'date-fns'
-import { id } from 'date-fns/locale'
-import { Plus, X, Save, ListChecks, AlertTriangle } from 'lucide-react'
+import { Plus, X, Save, BookOpen, Sparkles, ChevronDown, ChevronUp, ListTree, FileText } from 'lucide-react'
 
-const AMBANG_BATAS_PANGGIL_ORTU = 100
+const MAPEL = ['Pendidikan Agama','PPKn','Bahasa Indonesia','Matematika','IPAS','PJOK','Seni Budaya','Bahasa Inggris','Muatan Lokal']
 
-const KATEGORI = [
-  { value: 'beriman', label: 'Beriman, Bertakwa & Berakhlak Mulia' },
-  { value: 'kebinekaan', label: 'Berkebinekaan Global' },
-  { value: 'gotong_royong', label: 'Bergotong Royong' },
-  { value: 'mandiri', label: 'Mandiri' },
-  { value: 'bernalar_kritis', label: 'Bernalar Kritis' },
-  { value: 'kreatif', label: 'Kreatif' },
-]
-const KATEGORI_COLOR = {
-  beriman: 'bg-purple-100 text-purple-700', kebinekaan: 'bg-blue-100 text-blue-700',
-  gotong_royong: 'bg-green-100 text-green-700', mandiri: 'bg-orange-100 text-orange-700',
-  bernalar_kritis: 'bg-cyan-100 text-cyan-700', kreatif: 'bg-pink-100 text-pink-700',
-}
-function labelKategori(val) { return KATEGORI.find(k => k.value === val)?.label || val }
-
-export default function KarakterPage() {
+export default function KerangkaBabPage() {
   const router = useRouter()
-  const [profile, setProfile]   = useState(null)
-  const [kelas, setKelas]       = useState(null)
-  const [muridList, setMuridList] = useState([])
-  const [catatan, setCatatan]   = useState([])
-  const [aturanList, setAturanList] = useState([])
+  const [profile, setProfile] = useState(null)
+  const [kelas, setKelas]     = useState(null)
+  const [list, setList]       = useState([])
+  const [modulList, setModulList] = useState([])
+  const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
-  const [loading, setLoading]   = useState(true)
-  const [saving, setSaving]     = useState(false)
-  const [filterDimensi, setFilterDimensi] = useState('Semua')
-  const [form, setForm] = useState({
-    murid_id: '', tanggal: format(new Date(), 'yyyy-MM-dd'),
-    kategori: 'beriman', catatan: '', aturan_id: '', poin: null
-  })
+  const [saving, setSaving]   = useState(false)
+  const [filterMapel, setFilterMapel] = useState('Semua')
+  const [expanded, setExpanded] = useState(null)
+
+  const [mapel, setMapel] = useState('Matematika')
+  const [tingkat, setTingkat] = useState('3')
+  const [modulAjarId, setModulAjarId] = useState('')
+  const [nomorBab, setNomorBab] = useState('1')
+  const [judulBab, setJudulBab] = useState('')
+  const [latarBelakang, setLatarBelakang] = useState('')
+  const [tujuanPembelajaran, setTujuanPembelajaran] = useState('')
+  const [kerangkaPembelajaran, setKerangkaPembelajaran] = useState('')
+  const [jumlahSubBab, setJumlahSubBab] = useState('1')
+  const [subBabList, setSubBabList] = useState([{ judul: '', ringkasan: '', halaman_mulai: '', halaman_selesai: '' }])
 
   useEffect(() => {
     async function load() {
@@ -48,71 +38,67 @@ export default function KarakterPage() {
       setProfile(prof)
       const { data: kls } = await supabase.from('kelas').select('*').eq('wali_kelas_id', prof.id).single()
       setKelas(kls)
-      if (kls) {
-        const { data: murid } = await supabase.from('murid').select('*').eq('kelas_id', kls.id).order('nama')
-        setMuridList(murid || [])
-        loadCatatan(kls.id)
-        const { data: aturan } = await supabase.from('aturan_kelas').select('*').eq('kelas_id', kls.id).order('judul')
-        setAturanList(aturan || [])
-      }
+      if (kls) loadList()
+      const { data: modul } = await supabase.from('modul_ajar').select('*').not('file_url', 'is', null).order('mata_pelajaran').order('urutan')
+      setModulList(modul || [])
       setLoading(false)
     }
     load()
   }, [router])
 
-  const [semuaCatatanPoin, setSemuaCatatanPoin] = useState([])
-
-  async function loadCatatan(kelasId) {
-    const { data } = await supabase.from('catatan_karakter')
-      .select('*, murid(nama)').eq('kelas_id', kelasId)
-      .order('tanggal', { ascending: false }).limit(50)
-    setCatatan(data || [])
-    // Ambil semua data poin (tanpa limit) khusus untuk hitung ambang batas
-    const { data: semuaPoin } = await supabase.from('catatan_karakter')
-      .select('murid_id, poin').eq('kelas_id', kelasId).lt('poin', 0)
-    setSemuaCatatanPoin(semuaPoin || [])
+  async function loadList() {
+    const { data } = await supabase.from('modul_bab').select('*').order('mata_pelajaran').order('nomor_bab')
+    setList(data || [])
   }
 
-  function pilihAturan(aturanId) {
-    if (!aturanId) {
-      setForm(p => ({ ...p, aturan_id: '', poin: null }))
-      return
-    }
-    const aturan = aturanList.find(a => a.id === aturanId)
-    if (aturan) {
-      setForm(p => ({ ...p, aturan_id: aturanId, kategori: aturan.kategori, catatan: aturan.judul, poin: aturan.poin }))
-    }
+  function handleJumlahSubBabChange(val) {
+    setJumlahSubBab(val)
+    const n = Math.max(1, parseInt(val) || 1)
+    setSubBabList(prev => {
+      const list = [...prev]
+      while (list.length < n) list.push({ judul: '', ringkasan: '', halaman_mulai: '', halaman_selesai: '' })
+      while (list.length > n) list.pop()
+      return list
+    })
+  }
+
+  function updateSubBab(index, field, value) {
+    setSubBabList(prev => { const list = [...prev]; list[index] = { ...list[index], [field]: value }; return list })
+  }
+
+  function resetForm() {
+    setMapel('Matematika'); setTingkat('3'); setModulAjarId(''); setNomorBab('1'); setJudulBab('')
+    setLatarBelakang(''); setTujuanPembelajaran(''); setKerangkaPembelajaran('')
+    setJumlahSubBab('1'); setSubBabList([{ judul: '', ringkasan: '', halaman_mulai: '', halaman_selesai: '' }])
   }
 
   async function handleSave() {
-    if (!form.murid_id || !form.catatan.trim()) return
+    if (!judulBab.trim()) { alert('Judul bab harus diisi.'); return }
+    if (!tujuanPembelajaran.trim()) { alert('Tujuan pembelajaran harus diisi.'); return }
     setSaving(true)
-    await supabase.from('catatan_karakter').insert({
-      murid_id: form.murid_id, kelas_id: kelas.id, tanggal: form.tanggal,
-      kategori: form.kategori, catatan: form.catatan, aturan_id: form.aturan_id || null, poin: form.poin
+    const { data: { user } } = await supabase.auth.getUser()
+    const subBabBersih = subBabList.filter(s => s.judul.trim()).map(s => ({
+      judul: s.judul, ringkasan: s.ringkasan,
+      halaman_mulai: s.halaman_mulai ? parseInt(s.halaman_mulai) : null,
+      halaman_selesai: s.halaman_selesai ? parseInt(s.halaman_selesai) : null,
+    }))
+    await supabase.from('modul_bab').insert({
+      mata_pelajaran: mapel, tingkat: parseInt(tingkat), nomor_bab: parseInt(nomorBab) || 1,
+      judul: judulBab.trim(), latar_belakang: latarBelakang, tujuan_pembelajaran: tujuanPembelajaran,
+      kerangka_pembelajaran: kerangkaPembelajaran, sub_bab: subBabBersih,
+      modul_ajar_id: modulAjarId || null, uploaded_by: user.id
     })
-    setSaving(false)
-    setShowForm(false)
-    setForm({ murid_id: '', tanggal: format(new Date(), 'yyyy-MM-dd'), kategori: 'beriman', catatan: '', aturan_id: '', poin: null })
-    loadCatatan(kelas.id)
+    setSaving(false); setShowForm(false); resetForm(); loadList()
   }
 
-  async function handleDelete(catatanId) {
-    await supabase.from('catatan_karakter').delete().eq('id', catatanId)
-    loadCatatan(kelas.id)
+  async function handleDelete(id) {
+    if (!confirm('Hapus kerangka bab ini?')) return
+    await supabase.from('modul_bab').delete().eq('id', id)
+    loadList()
   }
 
-  const filtered = filterDimensi === 'Semua' ? catatan : catatan.filter(c => c.kategori === filterDimensi)
-
-  // Hitung total poin pelanggaran per murid (untuk peringatan panggil orang tua)
-  const totalPelanggaranPerMurid = {}
-  semuaCatatanPoin.forEach(c => {
-    totalPelanggaranPerMurid[c.murid_id] = (totalPelanggaranPerMurid[c.murid_id] || 0) + Math.abs(c.poin)
-  })
-  const muridMelewatiAmbangBatas = Object.entries(totalPelanggaranPerMurid)
-    .filter(([, total]) => total >= AMBANG_BATAS_PANGGIL_ORTU)
-    .map(([muridId, total]) => ({ murid: muridList.find(m => m.id === muridId), total }))
-    .filter(x => x.murid)
+  const filtered = filterMapel === 'Semua' ? list : list.filter(k => k.mata_pelajaran === filterMapel)
+  const modulUntukMapel = modulList.filter(m => m.mata_pelajaran === mapel)
 
   if (loading) return <div className="min-h-screen flex items-center justify-center"><p className="text-gray-400 text-sm">Memuat...</p></div>
 
@@ -121,99 +107,101 @@ export default function KarakterPage() {
       <Navbar namaGuru={profile?.nama} namaKelas={kelas?.nama} />
       <main className="pt-14 pb-8">
         <div className="bg-navy-800 px-4 pt-5 pb-8">
-          <h2 className="text-white font-bold text-lg">Catatan Karakter</h2>
-          <p className="text-navy-300 text-xs">{kelas?.nama} · Profil Pelajar Pancasila</p>
+          <h2 className="text-white font-bold text-lg">Kerangka Bab</h2>
+          <p className="text-navy-300 text-xs">Latar Belakang, Tujuan & Sub-Bab untuk bahan AI</p>
         </div>
 
         <div className="px-4 -mt-5 mb-4 space-y-2">
           <button onClick={() => setShowForm(true)} className="btn-primary w-full py-3 flex items-center justify-center gap-2">
-            <Plus size={16} /> Tambah Catatan
+            <Plus size={16} /> Tambah Kerangka Bab
           </button>
-          {aturanList.length === 0 && (
-            <div className="bg-orange-50 border border-orange-100 rounded-xl px-4 py-2.5 flex items-center gap-2">
-              <ListChecks size={16} className="text-orange-500 flex-shrink-0" />
-              <p className="text-xs text-orange-700">Belum ada Aturan Kelas. <button onClick={() => router.push('/aturan-kelas')} className="underline font-semibold">Buat dulu</button> supaya pencatatan lebih cepat & konsisten.</p>
-            </div>
-          )}
-          {muridMelewatiAmbangBatas.length > 0 && (
-            <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3">
-              <div className="flex items-center gap-2 mb-1">
-                <AlertTriangle size={16} className="text-red-500 flex-shrink-0" />
-                <p className="text-red-800 text-xs font-semibold">Perlu Pemanggilan Orang Tua</p>
-              </div>
-              <div className="space-y-0.5">
-                {muridMelewatiAmbangBatas.map(({ murid, total }) => (
-                  <p key={murid.id} className="text-red-700 text-xs">• {murid.nama} — {total} poin pelanggaran</p>
-                ))}
-              </div>
-            </div>
-          )}
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {['Semua', ...MAPEL].map(m => (
+              <button key={m} onClick={() => setFilterMapel(m)}
+                className={`flex-shrink-0 text-xs px-3 py-1.5 rounded-full font-medium transition-colors
+                  ${filterMapel === m ? 'bg-navy-700 text-white' : 'bg-white text-gray-600 border border-gray-200'}`}>{m}</button>
+            ))}
+          </div>
         </div>
 
         <div className="px-4 mb-4">
-          <div className="flex gap-2 overflow-x-auto pb-1">
-            <button onClick={() => setFilterDimensi('Semua')}
-              className={`flex-shrink-0 text-xs px-3 py-1.5 rounded-full font-medium transition-colors
-                ${filterDimensi === 'Semua' ? 'bg-navy-700 text-white' : 'bg-white text-gray-600 border border-gray-200'}`}>Semua</button>
-            {KATEGORI.map(k => (
-              <button key={k.value} onClick={() => setFilterDimensi(k.value)}
-                className={`flex-shrink-0 text-xs px-3 py-1.5 rounded-full font-medium transition-colors
-                  ${filterDimensi === k.value ? 'bg-navy-700 text-white' : 'bg-white text-gray-600 border border-gray-200'}`}>{k.label}</button>
-            ))}
+          <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3">
+            <p className="text-blue-800 text-xs font-semibold mb-1">Kenapa perlu diisi?</p>
+            <p className="text-blue-700 text-xs">Kerangka ini dibaca AI saat membuat RPP. Kalau kamu tautkan PDF modul dan tandai halaman tiap sub-bab, AI akan membaca isi buku asli di halaman itu — hasilnya lebih akurat.</p>
           </div>
         </div>
 
         {showForm && (
           <div className="fixed inset-0 bg-black/50 z-50 flex items-end">
             <div className="bg-white w-full rounded-t-2xl p-5 space-y-4 max-h-[90vh] overflow-y-auto">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="font-bold text-navy-800">Tambah Catatan Karakter</h3>
-                <button onClick={() => setShowForm(false)}><X size={20} className="text-gray-400" /></button>
-              </div>
-              <div>
-                <label className="label">Murid</label>
-                <select className="input" value={form.murid_id} onChange={e => setForm(p => ({ ...p, murid_id: e.target.value }))}>
-                  <option value="">-- Pilih Murid --</option>
-                  {muridList.map(m => <option key={m.id} value={m.id}>{m.nama}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="label">Tanggal</label>
-                <input type="date" className="input" value={form.tanggal} onChange={e => setForm(p => ({ ...p, tanggal: e.target.value }))} />
+              <div className="flex items-center justify-between">
+                <h3 className="font-bold text-navy-800">Tambah Kerangka Bab</h3>
+                <button onClick={() => { setShowForm(false); resetForm() }}><X size={20} className="text-gray-400" /></button>
               </div>
 
-              {aturanList.length > 0 && (
-                <div>
-                  <label className="label">Pilih dari Aturan Kelas (opsional, lebih cepat)</label>
-                  <select className="input" value={form.aturan_id} onChange={e => pilihAturan(e.target.value)}>
-                    <option value="">-- Tulis manual --</option>
-                    {aturanList.map(a => <option key={a.id} value={a.id}>{a.poin > 0 ? '+' : ''}{a.poin} · {a.judul}</option>)}
-                  </select>
-                  {form.poin !== null && (
-                    <p className={`text-xs mt-1 font-semibold ${form.poin > 0 ? 'text-green-600' : 'text-red-500'}`}>
-                      {form.poin > 0 ? '+' : ''}{form.poin} poin akan ditambahkan
-                    </p>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="col-span-2"><label className="label">Mata Pelajaran</label>
+                  <select className="input" value={mapel} onChange={e => { setMapel(e.target.value); setModulAjarId('') }}>{MAPEL.map(m => <option key={m} value={m}>{m}</option>)}</select>
+                </div>
+                <div><label className="label">Kelas</label>
+                  <select className="input" value={tingkat} onChange={e => setTingkat(e.target.value)}>{[1,2,3,4,5,6].map(n => <option key={n} value={n}>{n}</option>)}</select>
+                </div>
+              </div>
+
+              <div>
+                <label className="label flex items-center gap-1"><FileText size={13} /> Tautkan PDF Modul Ajar (opsional, disarankan)</label>
+                <select className="input" value={modulAjarId} onChange={e => setModulAjarId(e.target.value)}>
+                  <option value="">-- Tidak tautkan PDF --</option>
+                  {modulUntukMapel.map(m => <option key={m.id} value={m.id}>{m.judul}</option>)}
+                </select>
+                {modulUntukMapel.length === 0 && <p className="text-xs text-orange-500 mt-1">Belum ada modul PDF untuk {mapel}. <button onClick={() => router.push('/modul')} className="underline">Upload dulu</button></p>}
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div><label className="label">Nomor Bab</label>
+                  <input type="number" min="1" className="input" value={nomorBab} onChange={e => setNomorBab(e.target.value)} />
+                </div>
+                <div className="col-span-2"><label className="label">Judul Bab</label>
+                  <input className="input" placeholder="Contoh: Rumah dan Lingkunganku" value={judulBab} onChange={e => setJudulBab(e.target.value)} />
+                </div>
+              </div>
+
+              <div><label className="label">Latar Belakang</label>
+                <textarea className="input h-20 resize-none" placeholder="Kenapa topik ini penting/relevan dipelajari..." value={latarBelakang} onChange={e => setLatarBelakang(e.target.value)} />
+              </div>
+
+              <div><label className="label">Tujuan Pembelajaran <span className="text-red-500">*</span></label>
+                <textarea className="input h-24 resize-none" placeholder={"Tulis poin-poin tujuan, contoh:\n1. Murid dapat menjelaskan...\n2. Murid dapat mempraktikkan..."} value={tujuanPembelajaran} onChange={e => setTujuanPembelajaran(e.target.value)} />
+              </div>
+
+              <div><label className="label">Kerangka Pembelajaran</label>
+                <textarea className="input h-20 resize-none" placeholder="Garis besar alur/urutan materi dalam bab ini..." value={kerangkaPembelajaran} onChange={e => setKerangkaPembelajaran(e.target.value)} />
+              </div>
+
+              <div><label className="label">Jumlah Sub-Bab</label>
+                <input type="number" min="1" max="15" className="input" value={jumlahSubBab} onChange={e => handleJumlahSubBabChange(e.target.value)} />
+              </div>
+
+              {subBabList.map((sb, idx) => (
+                <div key={idx} className="bg-gray-50 rounded-xl p-3 border border-gray-100 space-y-2">
+                  <p className="text-xs font-semibold text-navy-700">Sub-Bab {idx + 1}</p>
+                  <input className="input text-sm" placeholder="Judul sub-bab" value={sb.judul} onChange={e => updateSubBab(idx, 'judul', e.target.value)} />
+                  <textarea className="input h-16 resize-none text-sm" placeholder="Ringkasan materi sub-bab ini..." value={sb.ringkasan} onChange={e => updateSubBab(idx, 'ringkasan', e.target.value)} />
+                  {modulAjarId && (
+                    <div className="grid grid-cols-2 gap-2">
+                      <div><label className="text-xs text-gray-500">Halaman Mulai</label>
+                        <input type="number" min="1" className="input text-sm" placeholder="3" value={sb.halaman_mulai} onChange={e => updateSubBab(idx, 'halaman_mulai', e.target.value)} />
+                      </div>
+                      <div><label className="text-xs text-gray-500">Halaman Selesai</label>
+                        <input type="number" min="1" className="input text-sm" placeholder="8" value={sb.halaman_selesai} onChange={e => updateSubBab(idx, 'halaman_selesai', e.target.value)} />
+                      </div>
+                    </div>
                   )}
                 </div>
-              )}
+              ))}
 
-              <div>
-                <label className="label">Dimensi Profil Pelajar Pancasila</label>
-                <select className="input" value={form.kategori} onChange={e => setForm(p => ({ ...p, kategori: e.target.value }))}>
-                  {KATEGORI.map(k => <option key={k.value} value={k.value}>{k.label}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="label">Catatan Kejadian</label>
-                <textarea
-                  className="input h-24 resize-none"
-                  placeholder="Tuliskan kejadian spesifik yang diamati..."
-                  value={form.catatan}
-                  onChange={e => setForm(p => ({ ...p, catatan: e.target.value }))}
-                />
-              </div>
               <button onClick={handleSave} disabled={saving} className="btn-primary w-full py-3 flex items-center justify-center gap-2 disabled:opacity-60">
-                <Save size={16} /> {saving ? 'Menyimpan...' : 'Simpan Catatan'}
+                <Save size={16} /> {saving ? 'Menyimpan...' : 'Simpan Kerangka Bab'}
               </button>
             </div>
           </div>
@@ -222,29 +210,53 @@ export default function KarakterPage() {
         <div className="px-4 space-y-3">
           {filtered.length === 0 && (
             <div className="card text-center py-8">
-              <p className="text-gray-400 text-sm">Belum ada catatan karakter.</p>
+              <BookOpen size={32} className="text-gray-200 mx-auto mb-2" />
+              <p className="text-gray-400 text-sm">Belum ada kerangka bab.</p>
             </div>
           )}
-          {filtered.map(c => (
-            <div key={c.id} className="card">
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1 flex-wrap">
-                    <p className="text-sm font-bold text-gray-800">{c.murid?.nama}</p>
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${KATEGORI_COLOR[c.kategori]}`}>{labelKategori(c.kategori)}</span>
-                    {c.poin !== null && c.poin !== undefined && (
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${c.poin > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                        {c.poin > 0 ? '+' : ''}{c.poin}
-                      </span>
-                    )}
+          {filtered.map(k => {
+            const isOpen = expanded === k.id
+            return (
+              <div key={k.id} className="card">
+                <button className="w-full flex items-start justify-between text-left" onClick={() => setExpanded(isOpen ? null : k.id)}>
+                  <div className="flex-1">
+                    <p className="text-xs text-gray-400">{k.mata_pelajaran} · Kelas {k.tingkat}</p>
+                    <p className="text-sm font-bold text-gray-800">Bab {k.nomor_bab}: {k.judul}</p>
+                    <p className="text-xs text-gray-400 mt-1">{k.sub_bab?.length || 0} sub-bab{k.modul_ajar_id ? ' · PDF tertaut' : ''}</p>
                   </div>
-                  <p className="text-xs text-gray-500 mb-2">{format(new Date(c.tanggal + 'T00:00:00'), 'd MMMM yyyy', { locale: id })}</p>
-                  <p className="text-sm text-gray-700">{c.catatan}</p>
-                </div>
-                <button onClick={() => handleDelete(c.id)} className="ml-3 text-gray-300 hover:text-red-400 transition-colors flex-shrink-0"><X size={16} /></button>
+                  {isOpen ? <ChevronUp size={16} className="text-gray-400" /> : <ChevronDown size={16} className="text-gray-400" />}
+                </button>
+
+                {isOpen && (
+                  <div className="mt-3 pt-3 border-t border-gray-100 space-y-3">
+                    {k.tujuan_pembelajaran && (
+                      <div><p className="text-xs font-semibold text-gray-600 mb-1">Tujuan Pembelajaran</p>
+                        <p className="text-xs text-gray-600 whitespace-pre-wrap">{k.tujuan_pembelajaran}</p></div>
+                    )}
+                    {k.sub_bab?.length > 0 && (
+                      <div>
+                        <p className="text-xs font-semibold text-gray-600 mb-1 flex items-center gap-1"><ListTree size={12} /> Sub-Bab</p>
+                        <ul className="space-y-1">
+                          {k.sub_bab.map((sb, i) => (
+                            <li key={i} className="text-xs text-gray-600">
+                              • {sb.judul}{sb.halaman_mulai ? ` (hal. ${sb.halaman_mulai}-${sb.halaman_selesai || sb.halaman_mulai})` : ''}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    <div className="flex gap-2 pt-1">
+                      <button onClick={() => router.push(`/rpp?kerangkaId=${k.id}`)}
+                        className="flex-1 text-xs py-2 rounded-lg bg-purple-50 text-purple-700 font-semibold border border-purple-200 flex items-center justify-center gap-1">
+                        <Sparkles size={12} /> Buat RPP dari Bab Ini
+                      </button>
+                      <button onClick={() => handleDelete(k.id)} className="text-xs py-2 px-3 rounded-lg bg-red-50 text-red-600 font-semibold border border-red-100">Hapus</button>
+                    </div>
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       </main>
     </div>
