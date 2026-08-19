@@ -6,39 +6,41 @@ import Navbar from '@/components/Navbar'
 import { Plus, X, Save, ThumbsUp, ThumbsDown, ListChecks, Download } from 'lucide-react'
 
 const KATEGORI = [
-  { value: 'beriman', label: 'Beriman, Bertakwa & Berakhlak Mulia' },
-  { value: 'kebinekaan', label: 'Berkebinekaan Global' },
-  { value: 'gotong_royong', label: 'Bergotong Royong' },
-  { value: 'mandiri', label: 'Mandiri' },
-  { value: 'bernalar_kritis', label: 'Bernalar Kritis' },
-  { value: 'kreatif', label: 'Kreatif' },
+  { value: 'keimanan', label: 'Keimanan & Ketakwaan' },
+  { value: 'kewargaan', label: 'Kewargaan' },
+  { value: 'kolaborasi', label: 'Kolaborasi' },
+  { value: 'kemandirian', label: 'Kemandirian' },
+  { value: 'penalaran_kritis', label: 'Penalaran Kritis' },
+  { value: 'kreativitas', label: 'Kreativitas' },
+  { value: 'kesehatan', label: 'Kesehatan' },
+  { value: 'komunikasi', label: 'Komunikasi' },
 ]
 function labelKategori(val) { return KATEGORI.find(k => k.value === val)?.label || val }
 
 const ATURAN_RESMI_SEKOLAH = [
-  ['Terlambat Datang Ke Sekolah', 10, 'mandiri'],
-  ['Meledek Dengan Nama Orang Tua', 15, 'beriman'],
-  ['Meledek Guru/Teman', 25, 'beriman'],
-  ['Keluar Gerbang Sekolah/Pulang Tanpa Izin', 20, 'mandiri'],
-  ['Mencelakakan Teman', 25, 'beriman'],
-  ['Tidak Membawa Perlengkapan Sekolah', 5, 'mandiri'],
-  ['Tidak Berseragam Lengkap', 10, 'mandiri'],
-  ['Berambut Gondrong', 15, 'mandiri'],
-  ['Pornografi', 30, 'beriman'],
-  ['Bawa Mainan / Barang Mewah', 25, 'mandiri'],
-  ['Corat-Coret Fasilitas Sekolah/Vandalisme', 30, 'beriman'],
-  ['Membuang Sampah Sembarangan', 20, 'gotong_royong'],
-  ['Berlaku Tidak Sopan', 15, 'beriman'],
-  ['Merusak Fasilitas Sekolah', 25, 'beriman'],
-  ['Meminta-minta/Memalak Teman', 15, 'beriman'],
-  ['Mengganggu Kelas Lain', 5, 'gotong_royong'],
-  ['Merusak Barang Milik Orang Lain dengan Sengaja', 20, 'beriman'],
-  ['Merokok & Membawa Rokok', 30, 'mandiri'],
-  ['Tidak Piket Sesuai Jadwal', 20, 'gotong_royong'],
-  ['Tidak Mengerjakan Tugas/PR', 15, 'mandiri'],
-  ['Tidak Mengindahkan Bel Masuk', 10, 'mandiri'],
-  ['Nongkrong/Diluar Saat Jam Pelajaran', 15, 'mandiri'],
-  ['Berkelahi Dengan Teman', 30, 'beriman'],
+  ['Terlambat Datang Ke Sekolah', 10, 'kemandirian'],
+  ['Meledek Dengan Nama Orang Tua', 15, 'keimanan'],
+  ['Meledek Guru/Teman', 25, 'keimanan'],
+  ['Keluar Gerbang Sekolah/Pulang Tanpa Izin', 20, 'kemandirian'],
+  ['Mencelakakan Teman', 25, 'keimanan'],
+  ['Tidak Membawa Perlengkapan Sekolah', 5, 'kemandirian'],
+  ['Tidak Berseragam Lengkap', 10, 'kemandirian'],
+  ['Berambut Gondrong', 15, 'kemandirian'],
+  ['Pornografi', 30, 'keimanan'],
+  ['Bawa Mainan / Barang Mewah', 25, 'kemandirian'],
+  ['Corat-Coret Fasilitas Sekolah/Vandalisme', 30, 'keimanan'],
+  ['Membuang Sampah Sembarangan', 20, 'kolaborasi'],
+  ['Berlaku Tidak Sopan', 15, 'keimanan'],
+  ['Merusak Fasilitas Sekolah', 25, 'keimanan'],
+  ['Meminta-minta/Memalak Teman', 15, 'keimanan'],
+  ['Mengganggu Kelas Lain', 5, 'kolaborasi'],
+  ['Merusak Barang Milik Orang Lain dengan Sengaja', 20, 'keimanan'],
+  ['Merokok & Membawa Rokok', 30, 'kemandirian'],
+  ['Tidak Piket Sesuai Jadwal', 20, 'kolaborasi'],
+  ['Tidak Mengerjakan Tugas/PR', 15, 'kemandirian'],
+  ['Tidak Mengindahkan Bel Masuk', 10, 'kemandirian'],
+  ['Nongkrong/Diluar Saat Jam Pelajaran', 15, 'kemandirian'],
+  ['Berkelahi Dengan Teman', 30, 'keimanan'],
 ]
 const AMBANG_BATAS_PANGGIL_ORTU = 100
 
@@ -56,7 +58,7 @@ export default function AturanKelasPage() {
   const [judul, setJudul] = useState('')
   const [jenisPoin, setJenisPoin] = useState('positif')
   const [poinAngka, setPoinAngka] = useState('1')
-  const [kategori, setKategori] = useState('mandiri')
+  const [kategori, setKategori] = useState('kemandirian')
 
   useEffect(() => {
     async function load() {
@@ -77,7 +79,7 @@ export default function AturanKelasPage() {
     setAturanList(data || [])
   }
 
-  function resetForm() { setJudul(''); setJenisPoin('positif'); setPoinAngka('1'); setKategori('mandiri') }
+  function resetForm() { setJudul(''); setJenisPoin('positif'); setPoinAngka('1'); setKategori('kemandirian') }
 
   async function handleSave() {
     if (!judul.trim()) { alert('Nama aturan harus diisi.'); return }
