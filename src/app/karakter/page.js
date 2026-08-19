@@ -10,17 +10,20 @@ import { Plus, X, Save, ListChecks, AlertTriangle } from 'lucide-react'
 const AMBANG_BATAS_PANGGIL_ORTU = 100
 
 const KATEGORI = [
-  { value: 'beriman', label: 'Beriman, Bertakwa & Berakhlak Mulia' },
-  { value: 'kebinekaan', label: 'Berkebinekaan Global' },
-  { value: 'gotong_royong', label: 'Bergotong Royong' },
-  { value: 'mandiri', label: 'Mandiri' },
-  { value: 'bernalar_kritis', label: 'Bernalar Kritis' },
-  { value: 'kreatif', label: 'Kreatif' },
+  { value: 'keimanan', label: 'Keimanan & Ketakwaan' },
+  { value: 'kewargaan', label: 'Kewargaan' },
+  { value: 'kolaborasi', label: 'Kolaborasi' },
+  { value: 'kemandirian', label: 'Kemandirian' },
+  { value: 'penalaran_kritis', label: 'Penalaran Kritis' },
+  { value: 'kreativitas', label: 'Kreativitas' },
+  { value: 'kesehatan', label: 'Kesehatan' },
+  { value: 'komunikasi', label: 'Komunikasi' },
 ]
 const KATEGORI_COLOR = {
-  beriman: 'bg-purple-100 text-purple-700', kebinekaan: 'bg-blue-100 text-blue-700',
-  gotong_royong: 'bg-green-100 text-green-700', mandiri: 'bg-orange-100 text-orange-700',
-  bernalar_kritis: 'bg-cyan-100 text-cyan-700', kreatif: 'bg-pink-100 text-pink-700',
+  keimanan: 'bg-purple-100 text-purple-700', kewargaan: 'bg-blue-100 text-blue-700',
+  kolaborasi: 'bg-green-100 text-green-700', kemandirian: 'bg-orange-100 text-orange-700',
+  penalaran_kritis: 'bg-cyan-100 text-cyan-700', kreativitas: 'bg-pink-100 text-pink-700',
+  kesehatan: 'bg-red-100 text-red-700', komunikasi: 'bg-yellow-100 text-yellow-700',
 }
 function labelKategori(val) { return KATEGORI.find(k => k.value === val)?.label || val }
 
@@ -37,7 +40,7 @@ export default function KarakterPage() {
   const [filterDimensi, setFilterDimensi] = useState('Semua')
   const [form, setForm] = useState({
     murid_id: '', tanggal: format(new Date(), 'yyyy-MM-dd'),
-    kategori: 'beriman', catatan: '', aturan_id: '', poin: null
+    kategori: 'keimanan', catatan: '', aturan_id: '', poin: null
   })
 
   useEffect(() => {
@@ -93,7 +96,7 @@ export default function KarakterPage() {
     })
     setSaving(false)
     setShowForm(false)
-    setForm({ murid_id: '', tanggal: format(new Date(), 'yyyy-MM-dd'), kategori: 'beriman', catatan: '', aturan_id: '', poin: null })
+    setForm({ murid_id: '', tanggal: format(new Date(), 'yyyy-MM-dd'), kategori: 'keimanan', catatan: '', aturan_id: '', poin: null })
     loadCatatan(kelas.id)
   }
 
