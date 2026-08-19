@@ -6,12 +6,25 @@ import Navbar from '@/components/Navbar'
 import { Plus, X, Upload, FileText, Download, Sparkles, Save, Loader, Printer } from 'lucide-react'
 
 const MAPEL = ['Pendidikan Agama','PPKn','Bahasa Indonesia','Matematika','IPAS','PJOK','Seni Budaya','Bahasa Inggris','Muatan Lokal']
+const DPL_LIST = [
+  { value: 'keimanan', label: 'Keimanan & Ketakwaan', wajib: true },
+  { value: 'kewargaan', label: 'Kewargaan' },
+  { value: 'penalaran_kritis', label: 'Penalaran Kritis' },
+  { value: 'kreativitas', label: 'Kreativitas' },
+  { value: 'kolaborasi', label: 'Kolaborasi' },
+  { value: 'kemandirian', label: 'Kemandirian' },
+  { value: 'kesehatan', label: 'Kesehatan' },
+  { value: 'komunikasi', label: 'Komunikasi' },
+]
+function labelDpl(val) { return DPL_LIST.find(d => d.value === val)?.label || val }
 const ROMAWI = { 1:'I', 2:'II', 3:'III', 4:'IV', 5:'V', 6:'VI' }
 function getFase(tingkat) {
   if (tingkat <= 2) return 'A'
   if (tingkat <= 4) return 'B'
   return 'C'
 }
+const KEPALA_SEKOLAH = 'N. Imas Winarti, S.Pd.'
+const KEPALA_SEKOLAH_NIP = '19701212 200003 2 005'
 function adaIsi(teks) {
   if (!teks) return false
   return !/tidak ada|tidak tersedia/i.test(teks.trim().slice(0, 40))
@@ -57,6 +70,7 @@ function RPPContent() {
   const [aiSubBabIdx, setAiSubBabIdx] = useState('')
   const [aiTujuan, setAiTujuan] = useState('')
   const [aiKondisi, setAiKondisi] = useState('')
+  const [aiDpl, setAiDpl] = useState(['keimanan'])
   const [aiLoading, setAiLoading] = useState(false)
   const [aiHasilRpp, setAiHasilRpp] = useState('')
   const [aiHasilBahanAjar, setAiHasilBahanAjar] = useState('')
@@ -148,7 +162,7 @@ function RPPContent() {
     setJumlahLkpd('1'); setLkpdList([{ file: null, deskripsi: '' }])
   }
   function resetAiForm() {
-    setAiKerangkaId(''); setAiSubBabIdx(''); setAiTujuan(''); setAiKondisi('')
+    setAiKerangkaId(''); setAiSubBabIdx(''); setAiTujuan(''); setAiKondisi(''); setAiDpl(['keimanan'])
     setAiHasilRpp(''); setAiHasilBahanAjar(''); setAiHasilMedia(''); setAiHasilLkpd(''); setAiHasilEvaluasi('')
     setAiError(''); setPreviewTab('rpp')
     setExtractStatus('idle'); setExtractedText(''); setExtractInfo(null)
@@ -214,14 +228,14 @@ Berikut KUTIPAN ISI BUKU ASLI (halaman ${subBab.halaman_mulai}-${subBab.halaman_
 ` : ''}
 
 Gunakan identitas berikut PERSIS (jangan diubah/dikarang):
-- Penyusun: ${profile?.nama || '-'}
+- Penyusun: ${profile?.nama || '-'} (Wali Kelas ${romawi})${profile?.nip ? ` — NIP. ${profile.nip}` : ''}
 - Instansi: SDN Pasirkaliki I
 - Tahun Penyusunan: ${tahunSekarang}
 - Jenjang Sekolah: SD
 - Fase / Kelas / Bab: ${fase} / ${romawi} (Kelas ${kerangka.tingkat}) / Bab ${kerangka.nomor_bab} (${kerangka.judul})
 - Pertemuan: ${nomorPertemuan} dari ${totalSubBab}
 - Semester: (tentukan Ganjil/Genap sesuai konteks umum)
-- Alokasi Waktu: (tentukan wajar, misal 2 x 35 menit)
+- Alokasi Waktu: 2 x 35 menit (1 Pertemuan)
 
 ===== BAGIAN 1: ISI MODUL AJAR =====
 Susun dengan struktur PERSIS berikut:
@@ -231,18 +245,20 @@ Susun dengan struktur PERSIS berikut:
 2. IDENTIFIKASI
 a. Peserta Didik: (Pengetahuan Dasar, Tingkat Kesiapan sesuai usia kelas ${kerangka.tingkat} SD)
 b. Materi Pembelajaran: (Pengetahuan yang Akan Dicapai, Tingkat Kesulitan, unsur Kolaborasi, Kreativitas, Penalaran Kritis)
-c. Dimensi Profil Lulusan: (pilih 2-3 dimensi paling relevan dari: Beriman Bertakwa dan Berakhlak Mulia, Berkebinekaan Global, Bergotong Royong, Mandiri, Bernalar Kritis, Kreatif — jelaskan penerapan konkretnya)
+c. Dimensi Profil Lulusan: WAJIB gunakan PERSIS ketiga dimensi berikut (jangan pilih dimensi lain): ${aiDpl.map(labelDpl).join(', ')}. Jelaskan penerapan konkretnya di sub-bab ini untuk masing-masing dimensi.
 
 3. KOMPONEN INTI
 a. Capaian Pembelajaran
-b. Kriteria Ketercapaian Tujuan Pembelajaran (KKTP): tulis sebagai daftar bernomor "KKTP 1", "KKTP 2", dst (buat 3-4 poin terukur, ini akan dirujuk di seluruh lampiran, jadi harus jelas dan spesifik)
-c. Pemahaman Bermakna
-d. Pertanyaan Pemantik
+b. Tujuan Pembelajaran: tulis 2-3 kalimat tujuan pembelajaran sub-bab ini
+c. Kriteria Ketercapaian Tujuan Pembelajaran (KKTP): tulis sebagai daftar bernomor "KKTP 1", "KKTP 2", dst (buat 3-4 poin terukur, diturunkan langsung dari Tujuan Pembelajaran di atas, ini akan dirujuk di seluruh lampiran, jadi harus jelas dan spesifik)
+d. Pemahaman Bermakna
+e. Pertanyaan Pemantik
+f. Media Pembelajaran: sebutkan "Buku Modul Pembelajaran ${kerangka.mata_pelajaran} Kelas ${kerangka.tingkat}" dan alat pendukung yang relevan (internet, proyektor/TV kelas, alat peraga sesuai materi, dll)
 
 4. KEGIATAN PEMBELAJARAN
-Kegiatan Pembuka (tentukan durasi): langkah-langkah detail dan konkret
-Kegiatan Inti (tentukan durasi): langkah-langkah detail, boleh dibagi beberapa bagian, sertakan metode/media yang cocok untuk anak SD (visual, gerak, kelompok), harus mengarah pada pencapaian setiap KKTP
-Kegiatan Penutup (tentukan durasi): langkah-langkah detail, termasuk refleksi pendidik dan refleksi murid (masing-masing 2-3 pertanyaan)
+Kegiatan Pembuka (10 Menit): langkah-langkah detail dan konkret, termasuk salam, doa, presensi, dan ice breaking singkat yang relevan dengan materi
+Kegiatan Inti (tentukan durasi sisa dari total alokasi waktu): langkah-langkah detail, boleh dibagi beberapa bagian (mengikuti kerangka Memahami-Mengaplikasi-Merefleksi), sertakan metode/media yang cocok untuk anak SD (visual, gerak, kelompok), harus mengarah pada pencapaian setiap KKTP
+Kegiatan Penutup (10 Menit): langkah-langkah detail, termasuk penguatan materi, refleksi pendidik dan refleksi murid (masing-masing 2-3 pertanyaan), MENYANYIKAN SALAH SATU LAGU DAERAH untuk menumbuhkan rasa cinta budaya, lalu doa dan salam penutup
 
 5. ASESMEN
 Sebutkan jenis asesmen formatif yang dipakai (observasi sikap, penilaian keterampilan, penilaian pengetahuan) sesuai KKTP di atas
@@ -333,7 +349,7 @@ Gunakan bahasa Indonesia yang jelas, praktis, dan siap pakai untuk guru SD. Semu
       jenis: 'ai', konten_ai: aiHasilRpp,
       lampiran_bahan_ajar: aiHasilBahanAjar, lampiran_media: aiHasilMedia,
       lampiran_lkpd: aiHasilLkpd, lampiran_evaluasi: aiHasilEvaluasi,
-      lkpd: [], uploaded_by: user.id, kerangka_bab_id: aiKerangkaId, sub_bab_judul: subBab.judul
+      lkpd: [], uploaded_by: user.id, kerangka_bab_id: aiKerangkaId, sub_bab_judul: subBab.judul, dpl_dimensi: aiDpl
     })
     setAiSaving(false); setMode(null); resetAiForm(); loadRpp()
   }
@@ -350,6 +366,9 @@ Gunakan bahasa Indonesia yang jelas, praktis, dan siap pakai untuk guru SD. Semu
         <div class="konten">${konten}</div>
       `
     }
+    const romawiTingkat = ROMAWI[rpp.tingkat] || rpp.tingkat
+    const namaGuru = profile?.nama || '-'
+    const nipGuru = profile?.nip ? `NIP. ${profile.nip}` : 'NIP. -'
     const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${rpp.judul}</title>
     <style>
       body{font-family:Arial;padding:30px 40px;color:#222;line-height:1.6}
@@ -362,6 +381,9 @@ Gunakan bahasa Indonesia yang jelas, praktis, dan siap pakai untuk guru SD. Semu
       .kop-kecil img{width:44px;height:44px}
       .nama-kecil{font-size:13px;font-weight:bold;color:#163a61}
       .sub-kecil{font-size:12px;color:#666;font-weight:600}
+      .ttd{display:flex;justify-content:space-between;margin-top:40px;font-size:13px}
+      .ttd .kolom{width:45%}
+      .ttd .spasi{height:60px}
       @media print{.no-print{display:none}}
     </style></head><body>
     <div class="no-print" style="text-align:center;margin-bottom:16px"><button onclick="window.print()" style="background:#163a61;color:white;border:none;padding:10px 24px;border-radius:8px;cursor:pointer">🖨️ Cetak PDF</button></div>
@@ -369,6 +391,22 @@ Gunakan bahasa Indonesia yang jelas, praktis, dan siap pakai untuk guru SD. Semu
     <h1>MODUL AJAR / PERENCANAAN PEMBELAJARAN MENDALAM</h1>
     <p class="sub">${rpp.judul} · ${rpp.mata_pelajaran} · Kelas ${rpp.tingkat || '-'}</p>
     <div class="konten">${rpp.konten_ai}</div>
+    <div class="ttd">
+      <div class="kolom">
+        <p>Mengetahui,</p>
+        <p><strong>Kepala Sekolah</strong></p>
+        <div class="spasi"></div>
+        <p>${KEPALA_SEKOLAH}</p>
+        <p>NIP. ${KEPALA_SEKOLAH_NIP}</p>
+      </div>
+      <div class="kolom">
+        <p>Karawang, .........................</p>
+        <p><strong>Wali Kelas ${romawiTingkat}</strong></p>
+        <div class="spasi"></div>
+        <p>${namaGuru}</p>
+        <p>${nipGuru}</p>
+      </div>
+    </div>
     ${halamanLampiran('Lampiran 1. Bahan Ajar', rpp.lampiran_bahan_ajar)}
     ${halamanLampiran('Lampiran 2. Media', rpp.lampiran_media)}
     ${halamanLampiran('Lampiran 3. LKPD', rpp.lampiran_lkpd)}
@@ -525,6 +563,31 @@ Gunakan bahasa Indonesia yang jelas, praktis, dan siap pakai untuk guru SD. Semu
                       {extractStatus === 'idle' && <>Sub-bab ini belum ditandai rentang halaman — RPP akan dibuat dari ringkasan manual saja. <button onClick={() => router.push('/kerangka')} className="underline">Atur di Kerangka Bab</button></>}
                     </div>
                   )}
+
+                  <div>
+                    <label className="label">Dimensi Profil Lulusan (maksimal 3, Keimanan wajib)</label>
+                    <div className="flex flex-wrap gap-2">
+                      {DPL_LIST.map(d => {
+                        const dipilih = aiDpl.includes(d.value)
+                        return (
+                          <button key={d.value} type="button" disabled={d.wajib}
+                            onClick={() => {
+                              if (d.wajib) return
+                              setAiDpl(prev => {
+                                if (prev.includes(d.value)) return prev.filter(v => v !== d.value)
+                                if (prev.length >= 3) { alert('Maksimal 3 dimensi (termasuk Keimanan).'); return prev }
+                                return [...prev, d.value]
+                              })
+                            }}
+                            className={`text-xs px-3 py-1.5 rounded-full font-medium border transition-colors
+                              ${dipilih ? 'bg-purple-600 text-white border-purple-600' : 'bg-white text-gray-600 border-gray-200'}
+                              ${d.wajib ? 'opacity-80 cursor-not-allowed' : ''}`}>
+                            {d.label}{d.wajib ? ' (wajib)' : ''}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
 
                   <div><label className="label">Tujuan Khusus (opsional)</label>
                     <textarea className="input h-16 resize-none" value={aiTujuan} onChange={e => setAiTujuan(e.target.value)} />
