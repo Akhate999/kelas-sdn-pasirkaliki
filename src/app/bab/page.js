@@ -21,6 +21,14 @@ export default function BabPage() {
   const [loading, setLoading]   = useState(true)
   const [saving, setSaving]     = useState(false)
   const [filterMapel, setFilterMapel] = useState('Semua')
+  const [kerangkaAktif, setKerangkaAktif] = useState(null)
+  const [rppPerSubBab, setRppPerSubBab] = useState({})
+  const [showTambahSubBab, setShowTambahSubBab] = useState(false)
+  const [subBabBaruJudul, setSubBabBaruJudul] = useState('')
+  const [subBabBaruRingkasan, setSubBabBaruRingkasan] = useState('')
+  const [subBabBaruHalMulai, setSubBabBaruHalMulai] = useState('')
+  const [subBabBaruHalSelesai, setSubBabBaruHalSelesai] = useState('')
+  const [savingSubBab, setSavingSubBab] = useState(false)
   const [form, setForm] = useState({
     mata_pelajaran: 'Matematika', nomor_bab: '1', judul_bab: '',
     tanggal_mulai: format(new Date(), 'yyyy-MM-dd'),
@@ -60,16 +68,44 @@ export default function BabPage() {
 
   function handleMapelChange(mapel) {
     setForm(p => ({ ...p, mata_pelajaran: mapel, modul_ajar_id: '', rpp_id: '', kerangka_bab_id: '' }))
+    setKerangkaAktif(null)
+    setRppPerSubBab({})
   }
 
-  function handleKerangkaPilih(kerangkaId) {
+  async function handleKerangkaPilih(kerangkaId) {
     const kerangka = kerangkaList.find(k => k.id === kerangkaId)
     setForm(p => ({ ...p, kerangka_bab_id: kerangkaId, judul_bab: kerangka ? kerangka.judul : p.judul_bab, nomor_bab: kerangka ? String(kerangka.nomor_bab) : p.nomor_bab }))
+    setKerangkaAktif(kerangka || null)
+    if (kerangka) {
+      const { data: rppList } = await supabase.from('rpp').select('id, sub_bab_judul').eq('kerangka_bab_id', kerangkaId)
+      const map = {}
+      ;(rppList || []).forEach(r => { map[r.sub_bab_judul] = r.id })
+      setRppPerSubBab(map)
+    }
   }
 
   function handleModulPilih(modulId) {
     const modul = modulList.find(m => m.id === modulId)
     setForm(p => ({ ...p, modul_ajar_id: modulId, judul_bab: modul ? modul.judul : p.judul_bab }))
+  }
+
+  async function tambahSubBabBaru() {
+    if (!subBabBaruJudul.trim()) { alert('Judul sub-bab harus diisi.'); return }
+    if (!kerangkaAktif) return
+    setSavingSubBab(true)
+    const subBabBaru = {
+      judul: subBabBaruJudul.trim(), ringkasan: subBabBaruRingkasan,
+      halaman_mulai: subBabBaruHalMulai ? parseInt(subBabBaruHalMulai) : null,
+      halaman_selesai: subBabBaruHalSelesai ? parseInt(subBabBaruHalSelesai) : null,
+    }
+    const subBabUpdated = [...(kerangkaAktif.sub_bab || []), subBabBaru]
+    await supabase.from('modul_bab').update({ sub_bab: subBabUpdated }).eq('id', kerangkaAktif.id)
+    const kerangkaBaru = { ...kerangkaAktif, sub_bab: subBabUpdated }
+    setKerangkaAktif(kerangkaBaru)
+    setKerangkaList(prev => prev.map(k => k.id === kerangkaAktif.id ? kerangkaBaru : k))
+    setSavingSubBab(false)
+    setShowTambahSubBab(false)
+    setSubBabBaruJudul(''); setSubBabBaruRingkasan(''); setSubBabBaruHalMulai(''); setSubBabBaruHalSelesai('')
   }
 
   async function handleSave() {
@@ -250,14 +286,40 @@ export default function BabPage() {
               {modulUntukMapel.length === 0 && <p className="text-xs text-gray-400 mt-1">Belum ada modul untuk {form.mata_pelajaran}</p>}
             </div>
 
-            <div>
-              <label className="label">Pilih RPP (opsional)</label>
-              <select className="input" value={form.rpp_id} onChange={e => setForm(p => ({ ...p, rpp_id: e.target.value }))}>
-                <option value="">-- Tidak pakai RPP --</option>
-                {rppUntukMapel.map(r => <option key={r.id} value={r.id}>{r.judul}</option>)}
-              </select>
-              {rppUntukMapel.length === 0 && <p className="text-xs text-gray-400 mt-1">Belum ada RPP untuk {form.mata_pelajaran}. <button onClick={() => router.push('/rpp')} className="underline text-navy-600">Buat RPP dulu</button></p>}
-            </div>
+            {kerangkaAktif && (
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="label mb-0">Sub-Bab & RPP ({kerangkaAktif.sub_bab?.length || 0})</label>
+                  <button onClick={() => setShowTambahSubBab(true)} className="text-xs text-navy-600 font-semibold flex items-center gap-1">
+                    <Plus size={12} /> Tambah Sub-Bab
+                  </button>
+                </div>
+                <div className="space-y-2">
+                  {(kerangkaAktif.sub_bab || []).length === 0 && (
+                    <p className="text-xs text-gray-400 py-2">Belum ada sub-bab. Tambahkan dulu.</p>
+                  )}
+                  {(kerangkaAktif.sub_bab || []).map((sb, idx) => {
+                    const rppId = rppPerSubBab[sb.judul]
+                    return (
+                      <div key={idx} className="bg-gray-50 rounded-lg px-3 py-2 flex items-center justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-semibold text-gray-700 truncate">{sb.judul}</p>
+                          {sb.halaman_mulai && <p className="text-xs text-gray-400">Hal. {sb.halaman_mulai}-{sb.halaman_selesai || sb.halaman_mulai}</p>}
+                        </div>
+                        {rppId ? (
+                          <span className="text-xs text-green-600 font-semibold flex items-center gap-1 flex-shrink-0"><CheckCircle size={12} /> RPP Ada</span>
+                        ) : (
+                          <button onClick={() => router.push(`/rpp?kerangkaId=${kerangkaAktif.id}&subBabIdx=${idx}`)}
+                            className="text-xs bg-purple-50 text-purple-700 font-semibold px-2 py-1 rounded-lg border border-purple-200 flex-shrink-0">
+                            + Buat RPP
+                          </button>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -286,6 +348,40 @@ export default function BabPage() {
             <button onClick={handleSave} disabled={saving}
               className="btn-primary w-full py-3 flex items-center justify-center gap-2 disabled:opacity-60">
               <Save size={16} /> {saving ? 'Menyimpan...' : 'Simpan Bab'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showTambahSubBab && (
+        <div className="fixed inset-0 bg-black/50 z-[60] flex items-end">
+          <div className="bg-white w-full rounded-t-2xl p-5 space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-navy-800">Tambah Sub-Bab Baru</h3>
+              <button onClick={() => setShowTambahSubBab(false)}><X size={20} className="text-gray-400" /></button>
+            </div>
+            <p className="text-xs text-gray-500">Ditambahkan ke: Bab {kerangkaAktif?.nomor_bab} — {kerangkaAktif?.judul}</p>
+            <div>
+              <label className="label">Judul Sub-Bab</label>
+              <input className="input" placeholder="Contoh: Aku dan Teman Sekelasku" value={subBabBaruJudul} onChange={e => setSubBabBaruJudul(e.target.value)} />
+            </div>
+            <div>
+              <label className="label">Ringkasan Materi</label>
+              <textarea className="input h-20 resize-none" placeholder="Ringkasan singkat materi sub-bab ini..." value={subBabBaruRingkasan} onChange={e => setSubBabBaruRingkasan(e.target.value)} />
+            </div>
+            {kerangkaAktif?.modul_ajar_id && (
+              <div className="grid grid-cols-2 gap-3">
+                <div><label className="label">Halaman Mulai</label>
+                  <input type="number" min="1" className="input" placeholder="3" value={subBabBaruHalMulai} onChange={e => setSubBabBaruHalMulai(e.target.value)} />
+                </div>
+                <div><label className="label">Halaman Selesai</label>
+                  <input type="number" min="1" className="input" placeholder="8" value={subBabBaruHalSelesai} onChange={e => setSubBabBaruHalSelesai(e.target.value)} />
+                </div>
+              </div>
+            )}
+            <button onClick={tambahSubBabBaru} disabled={savingSubBab}
+              className="btn-primary w-full py-3 flex items-center justify-center gap-2 disabled:opacity-60">
+              <Save size={16} /> {savingSubBab ? 'Menyimpan...' : 'Tambah Sub-Bab'}
             </button>
           </div>
         </div>
