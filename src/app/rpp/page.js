@@ -48,6 +48,7 @@ function RPPContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const kerangkaIdFromUrl = searchParams.get('kerangkaId')
+  const subBabIdxFromUrl = searchParams.get('subBabIdx')
 
   const [profile, setProfile] = useState(null)
   const [kelas, setKelas]     = useState(null)
@@ -98,12 +99,17 @@ function RPPContent() {
       setKerangkaList(kerangka || [])
       if (kerangkaIdFromUrl) {
         const k = (kerangka || []).find(x => x.id === kerangkaIdFromUrl)
-        if (k) { setMode('ai'); setAiMapel(k.mata_pelajaran); setAiKerangkaId(k.id) }
+        if (k) {
+          setMode('ai'); setAiMapel(k.mata_pelajaran); setAiKerangkaId(k.id)
+          if (subBabIdxFromUrl !== null && k.sub_bab?.[parseInt(subBabIdxFromUrl)]) {
+            setAiSubBabIdx(subBabIdxFromUrl)
+          }
+        }
       }
       setLoading(false)
     }
     load()
-  }, [router, kerangkaIdFromUrl])
+  }, [router, kerangkaIdFromUrl, subBabIdxFromUrl])
 
   async function loadRpp() {
     const { data } = await supabase.from('rpp').select('*').order('created_at', { ascending: false })
