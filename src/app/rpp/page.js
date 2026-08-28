@@ -73,6 +73,7 @@ function RPPContent() {
   const [aiKondisi, setAiKondisi] = useState('')
   const [aiDpl, setAiDpl] = useState(['keimanan'])
   const [aiLoading, setAiLoading] = useState(false)
+  const [aiProgress, setAiProgress] = useState('')
   const [aiHasilRpp, setAiHasilRpp] = useState('')
   const [aiHasilBahanAjar, setAiHasilBahanAjar] = useState('')
   const [aiHasilMedia, setAiHasilMedia] = useState('')
@@ -170,7 +171,7 @@ function RPPContent() {
   function resetAiForm() {
     setAiKerangkaId(''); setAiSubBabIdx(''); setAiTujuan(''); setAiKondisi(''); setAiDpl(['keimanan'])
     setAiHasilRpp(''); setAiHasilBahanAjar(''); setAiHasilMedia(''); setAiHasilLkpd(''); setAiHasilEvaluasi('')
-    setAiError(''); setPreviewTab('rpp')
+    setAiError(''); setPreviewTab('rpp'); setAiProgress('')
     setExtractStatus('idle'); setExtractedText(''); setExtractInfo(null)
   }
 
@@ -206,7 +207,7 @@ function RPPContent() {
     if (!kerangka) { alert('Pilih Kerangka Bab terlebih dahulu.'); return }
     if (aiSubBabIdx === '') { alert('Pilih Sub-Bab yang akan dibuatkan RPP.'); return }
     const subBab = kerangka.sub_bab[parseInt(aiSubBabIdx)]
-    setAiLoading(true); setAiError('')
+    setAiLoading(true); setAiError(''); setAiProgress('Menyusun isi RPP...')
     setAiHasilRpp(''); setAiHasilBahanAjar(''); setAiHasilMedia(''); setAiHasilLkpd(''); setAiHasilEvaluasi('')
 
     const fase = getFase(kerangka.tingkat)
@@ -215,7 +216,13 @@ function RPPContent() {
     const totalSubBab = kerangka.sub_bab.length
     const nomorPertemuan = parseInt(aiSubBabIdx) + 1
 
-    const prompt = `Kamu adalah ahli pendidikan yang membantu guru SD menyusun Modul Ajar/PPM (Perencanaan Pembelajaran Mendalam) LENGKAP beserta lampirannya, sesuai kurikulum terbaru.
+    const konteksBuku = extractStatus === 'done' && extractedText ? `
+Berikut KUTIPAN ISI BUKU ASLI (halaman ${subBab.halaman_mulai}-${subBab.halaman_selesai || subBab.halaman_mulai}) yang HARUS dijadikan acuan UTAMA — jangan menyimpang dari materi ini:
+"""${extractedText}"""
+` : ''
+
+    // ===== PANGGILAN 1: ISI RPP =====
+    const promptRpp = `Kamu adalah ahli pendidikan yang membantu guru SD menyusun Modul Ajar/PPM (Perencanaan Pembelajaran Mendalam) sesuai kurikulum terbaru.
 
 Berikut kerangka Bab yang menjadi acuan:
 - Mata Pelajaran: ${kerangka.mata_pelajaran}
@@ -228,11 +235,7 @@ Berikut kerangka Bab yang menjadi acuan:
 Modul ini KHUSUS untuk satu sub-bab berikut (fokuskan seluruh isi di sini):
 - Sub-Bab: ${subBab.judul}
 - Ringkasan Materi Sub-Bab: ${subBab.ringkasan || '(gunakan judul sub-bab dan tujuan keseluruhan bab sebagai acuan)'}
-${extractStatus === 'done' && extractedText ? `
-Berikut KUTIPAN ISI BUKU ASLI (halaman ${subBab.halaman_mulai}-${subBab.halaman_selesai || subBab.halaman_mulai}) yang HARUS dijadikan acuan UTAMA untuk seluruh isi Modul dan Lampiran (terutama Bahan Ajar) — jangan menyimpang dari materi ini:
-"""${extractedText}"""
-` : ''}
-
+${konteksBuku}
 Gunakan identitas berikut PERSIS (jangan diubah/dikarang):
 - Penyusun: ${profile?.nama || '-'} (Wali Kelas ${romawi})${profile?.nip ? ` — NIP. ${profile.nip}` : ''}
 - Instansi: SDN Pasirkaliki I
@@ -243,10 +246,9 @@ Gunakan identitas berikut PERSIS (jangan diubah/dikarang):
 - Semester: (tentukan Ganjil/Genap sesuai konteks umum)
 - Alokasi Waktu: 2 x 35 menit (1 Pertemuan)
 
-===== BAGIAN 1: ISI MODUL AJAR =====
-Susun dengan struktur PERSIS berikut:
+Susun dengan struktur PERSIS berikut. JANGAN gunakan simbol markdown seperti **, ###, atau tabel bergaya |---|---| — tulis sebagai teks biasa dengan judul bagian dan baris data yang jelas (format "Label: isi" per baris), karena hasil ini akan dicetak langsung tanpa pemrosesan markdown.
 
-1. IDENTITAS MODUL (tampilkan semua identitas di atas)
+1. IDENTITAS MODUL (tampilkan semua identitas di atas, satu baris per item)
 
 2. IDENTIFIKASI
 a. Peserta Didik: (Pengetahuan Dasar, Tingkat Kesiapan sesuai usia kelas ${kerangka.tingkat} SD)
@@ -275,20 +277,43 @@ Pengayaan untuk murid yang sudah menguasai KKTP; Remedial untuk murid yang belum
 ${aiTujuan ? `Catatan tambahan dari guru: ${aiTujuan}` : ''}
 ${aiKondisi ? `Kondisi kelas yang perlu dipertimbangkan: ${aiKondisi}. Sesuaikan strategi pembelajaran.` : ''}
 
-===== BAGIAN 2: LAMPIRAN (WAJIB DIBUAT SEMUA, gunakan KKTP yang sama persis dari Bagian 1) =====
+Gunakan bahasa Indonesia yang jelas, praktis, dan siap pakai untuk guru SD. Tulis LENGKAP sampai bagian 6 selesai, jangan terpotong.`
 
-Setelah selesai menulis BAGIAN 1 di atas, tambahkan baris pemisah PERSIS ini lalu lanjutkan tiap lampiran dengan pemisahnya masing-masing:
+    let rppText = ''
+    try {
+      const res = await fetch('/api/ai', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: promptRpp, maxTokens: 4000 })
+      })
+      const data = await res.json()
+      if (data.error) { setAiError(data.error); setAiLoading(false); setAiProgress(''); return }
+      rppText = data.text.trim()
+      setAiHasilRpp(rppText)
+    } catch {
+      setAiError('Gagal terhubung ke server AI saat menyusun RPP. Coba lagi.')
+      setAiLoading(false); setAiProgress(''); return
+    }
+
+    // ===== PANGGILAN 2: 4 LAMPIRAN =====
+    setAiProgress('Menyusun 4 Lampiran (Bahan Ajar, Media, LKPD, Evaluasi)...')
+
+    const promptLampiran = `Kamu adalah ahli pendidikan yang membantu guru SD menyusun lampiran Modul Ajar/PPM.
+
+Berikut RPP/Modul Ajar yang SUDAH DIBUAT sebagai acuan (gunakan KKTP dan Dimensi Profil Lulusan PERSIS dari sini, jangan berubah):
+"""${rppText}"""
+${konteksBuku}
+Buatkan 4 LAMPIRAN berikut. Gunakan pemisah PERSIS seperti di bawah ini, dan JANGAN gunakan simbol markdown seperti **, ###, atau |---|---| — tulis sebagai teks biasa yang rapi dan siap cetak.
 
 ===LAMPIRAN_BAHAN_AJAR===
 Tulis "Lampiran 1. Bahan Ajar – [topik sub-bab]" lalu:
-- Salin ulang: Capaian Pembelajaran, Tujuan Pembelajaran, KKTP (dari Bagian 1)
-- Uraian Materi: susun dengan heading A, B, C, dst — SATU heading per KKTP, isi dengan materi SUNGGUHAN yang bisa langsung dibaca murid/guru (bukan placeholder, tulis penjelasan konsep yang benar dan sesuai usia anak kelas ${kerangka.tingkat} SD, boleh pakai tabel/contoh konkret bila membantu)
+- Salin ulang: Capaian Pembelajaran, Tujuan Pembelajaran, KKTP (dari RPP di atas)
+- Uraian Materi: susun dengan sub-judul A, B, C, dst — SATU sub-judul per KKTP, isi dengan materi SUNGGUHAN yang bisa langsung dibaca murid/guru (bukan placeholder, tulis penjelasan konsep yang benar dan sesuai usia anak kelas ${kerangka.tingkat} SD, boleh pakai contoh konkret bila membantu)
 - Rangkuman: 1 paragraf inti materi
 
 ===LAMPIRAN_MEDIA===
 Tulis "Lampiran 2. Media" lalu:
 - Salin ulang: Capaian Pembelajaran, Tujuan Pembelajaran, KKTP
-- Untuk SETIAP KKTP, sarankan jenis media yang cocok (contoh: "video animasi tentang...", "gambar diagram...", "alat peraga fisik berupa...") beserta 1 kalimat alasan kenapa cocok, dan sertakan 2-3 kata kunci pencarian yang bisa dipakai guru untuk mencari media tersebut sendiri di internet/YouTube. JANGAN membuat/mengarang URL/tautan asli.
+- Untuk SETIAP KKTP, sarankan jenis media yang cocok beserta 1 kalimat alasan, dan 2-3 kata kunci pencarian yang bisa dipakai guru mencari media itu sendiri. JANGAN membuat/mengarang URL/tautan asli.
 
 ===LAMPIRAN_LKPD===
 Tulis "Lampiran 3. Lembar Kerja Peserta Didik (LKPD)" lalu buat lembar kerja siap cetak:
@@ -299,30 +324,26 @@ Jika sub-bab ini tidak memerlukan tugas tertulis, tulis PERSIS: "Tidak ada LKPD 
 
 ===LAMPIRAN_EVALUASI===
 Tulis "Lampiran 4. Evaluasi" lalu buat lengkap:
-- Rubrik Penilaian Sikap: tabel dengan kolom Aspek | 4-Sangat Baik | 3-Baik | 2-Cukup | 1-Perlu Bimbingan. Aspek disesuaikan dengan Dimensi Profil Lulusan yang dipilih di Bagian 1.
-- Rubrik Penilaian Keterampilan: tabel serupa, aspek sesuai aktivitas KKTP di atas.
-- Kisi-kisi Soal: tabel dengan kolom No | KKTP | Indikator Soal | Level Kognitif (C1-C6) | Bentuk Soal | Tingkat Kesukaran. Buat minimal 1 baris per KKTP, indikator soal ditulis dengan format "Disajikan .../murid dapat ..." (jangan pakai kata "dapat/bisa/mampu" di awal kalimat indikator).
-- Instrumen Soal: tulis soal-soal sungguhan sesuai kisi-kisi di atas (pilihan ganda/isian/esai sesuai bentuk soal), diurutkan mudah-sedang-sukar.
-- Kunci Jawaban: jawaban benar untuk setiap soal di atas.
-- Pedoman Penskoran: rumus nilai = (skor perolehan ÷ skor maksimal) × 100, kriteria 86-100 Sangat Baik, 76-85 Baik, 66-75 Cukup, <66 Perlu Bimbingan, dan ketentuan ketuntasan minimal.
+- Rubrik Penilaian Sikap: untuk setiap Dimensi Profil Lulusan yang dipilih, buat 4 level (Sangat Baik/Baik/Cukup/Perlu Bimbingan) dengan deskripsi masing-masing, ditulis per baris (bukan tabel markdown)
+- Rubrik Penilaian Keterampilan: format serupa, sesuai aktivitas KKTP di atas
+- Kisi-kisi Soal: untuk tiap KKTP tulis per baris: Nomor, KKTP terkait, Indikator Soal (format "Disajikan .../murid dapat...", hindari kata "dapat/bisa/mampu" di awal), Level Kognitif (C1-C6), Bentuk Soal, Tingkat Kesukaran
+- Instrumen Soal: tulis soal-soal sungguhan sesuai kisi-kisi di atas, diurutkan mudah-sedang-sukar
+- Kunci Jawaban: jawaban benar untuk setiap soal di atas
+- Pedoman Penskoran: rumus nilai = (skor perolehan bagi skor maksimal) dikali 100, kriteria 86-100 Sangat Baik, 76-85 Baik, 66-75 Cukup, kurang dari 66 Perlu Bimbingan, dan ketentuan ketuntasan minimal
 
-Gunakan bahasa Indonesia yang jelas, praktis, dan siap pakai untuk guru SD. Semua konten harus konkret dan sungguhan, tidak boleh ada placeholder seperti "aaaa" atau "isi di sini".`
+Gunakan bahasa Indonesia yang jelas dan praktis untuk guru SD. Semua konten harus konkret dan sungguhan, tidak boleh ada placeholder. Tulis LENGKAP keempat lampiran sampai selesai, jangan terpotong.`
 
     try {
       const res = await fetch('/api/ai', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt, maxTokens: 7000 })
+        body: JSON.stringify({ prompt: promptLampiran, maxTokens: 6000 })
       })
       const data = await res.json()
       if (data.error) {
-        setAiError(data.error)
+        setAiError('RPP berhasil dibuat, tapi lampiran gagal: ' + data.error)
       } else {
-        const bagianRpp = data.text.split(/===LAMPIRAN_BAHAN_AJAR===/i)
-        const rppText = (bagianRpp[0] || '').trim()
-        const sisaSetelahRpp = bagianRpp[1] || ''
-
-        const bagianBahanAjar = sisaSetelahRpp.split(/===LAMPIRAN_MEDIA===/i)
-        const bahanAjarText = (bagianBahanAjar[0] || '').trim()
+        const bagianBahanAjar = data.text.split(/===LAMPIRAN_MEDIA===/i)
+        const bahanAjarText = (bagianBahanAjar[0] || '').replace(/===LAMPIRAN_BAHAN_AJAR===/i, '').trim()
         const sisaSetelahBahanAjar = bagianBahanAjar[1] || ''
 
         const bagianMedia = sisaSetelahBahanAjar.split(/===LAMPIRAN_LKPD===/i)
@@ -333,15 +354,17 @@ Gunakan bahasa Indonesia yang jelas, praktis, dan siap pakai untuk guru SD. Semu
         const lkpdText = (bagianLkpd[0] || '').trim()
         const evaluasiText = (bagianLkpd[1] || '').trim()
 
-        setAiHasilRpp(rppText)
         setAiHasilBahanAjar(bahanAjarText)
         setAiHasilMedia(mediaText)
         setAiHasilLkpd(lkpdText)
         setAiHasilEvaluasi(evaluasiText)
-        setPreviewTab('rpp')
       }
-    } catch { setAiError('Gagal terhubung ke server AI. Coba lagi.') }
+    } catch {
+      setAiError('RPP berhasil dibuat, tapi gagal terhubung ke server AI saat menyusun lampiran.')
+    }
+    setPreviewTab('rpp')
     setAiLoading(false)
+    setAiProgress('')
   }
 
   async function simpanRppAI() {
@@ -604,13 +627,18 @@ Gunakan bahasa Indonesia yang jelas, praktis, dan siap pakai untuk guru SD. Semu
                   {aiError && <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{aiError}</p>}
                   <button onClick={handleBuatAI} disabled={aiLoading || !aiKerangkaId || aiSubBabIdx === '' || extractStatus === 'loading'}
                     className="w-full py-3 flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg disabled:opacity-60">
-                    {aiLoading ? <><Loader size={16} className="animate-spin" /> AI sedang menyusun RPP + 4 Lampiran... (bisa 1-2 menit)</> : <><Sparkles size={16} /> Buat RPP + Lampiran</>}
+                    {aiLoading ? <><Loader size={16} className="animate-spin" /> {aiProgress || 'Memproses...'}</> : <><Sparkles size={16} /> Buat RPP + Lampiran</>}
                   </button>
                 </>
               )}
 
               {aiHasilRpp && (
                 <>
+                  {aiLoading && (
+                    <div className="bg-blue-50 text-blue-700 text-xs rounded-lg px-3 py-2 flex items-center gap-2">
+                      <Loader size={12} className="animate-spin" /> {aiProgress}
+                    </div>
+                  )}
                   <div className="flex gap-1 overflow-x-auto pb-1">
                     {previewTabs.map(([key, label]) => (
                       <button key={key} onClick={() => setPreviewTab(key)}
@@ -625,9 +653,9 @@ Gunakan bahasa Indonesia yang jelas, praktis, dan siap pakai untuk guru SD. Semu
                     onChange={e => setterMap[previewTab](e.target.value)} />
                   <div className="flex gap-2">
                     <button onClick={resetAiForm} className="flex-1 text-xs py-2.5 rounded-lg bg-gray-100 text-gray-700 font-semibold">↻ Buat Ulang</button>
-                    <button onClick={simpanRppAI} disabled={aiSaving}
+                    <button onClick={simpanRppAI} disabled={aiSaving || aiLoading}
                       className="flex-1 text-xs py-2.5 rounded-lg bg-purple-600 text-white font-semibold flex items-center justify-center gap-1 disabled:opacity-60">
-                      <Save size={14} /> {aiSaving ? 'Menyimpan...' : 'Simpan Semua'}
+                      <Save size={14} /> {aiSaving ? 'Menyimpan...' : aiLoading ? 'Tunggu lampiran selesai...' : 'Simpan Semua'}
                     </button>
                   </div>
                 </>
