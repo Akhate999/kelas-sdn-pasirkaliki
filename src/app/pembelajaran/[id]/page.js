@@ -62,6 +62,21 @@ export default function PembelajaranDetailPage() {
     load()
   }, [babId, router])
 
+  async function reloadPertemuan() {
+    const { data } = await supabase.from('pertemuan_bab').select('*').eq('bab_id', babId)
+    setPertemuanList(data || [])
+  }
+
+  async function aturTanggalPelaksanaan(subBabJudul, tanggal) {
+    const existing = pertemuanList.find(p => p.sub_bab_judul === subBabJudul)
+    if (existing) {
+      await supabase.from('pertemuan_bab').update({ tanggal }).eq('id', existing.id)
+    } else {
+      await supabase.from('pertemuan_bab').insert({ bab_id: babId, sub_bab_judul: subBabJudul, tanggal })
+    }
+    await reloadPertemuan()
+  }
+
   if (loading) return <div className="min-h-screen flex items-center justify-center"><p className="text-gray-400 text-sm">Memuat...</p></div>
 
   const subBabArr = kerangka?.sub_bab || []
@@ -101,6 +116,7 @@ export default function PembelajaranDetailPage() {
                   {isOpen && (
                     <SubBabDetail
                       subBab={sb} bab={bab} kelas={kelas} muridList={muridList} pertemuan={pertemuan}
+                      onAturTanggal={(tanggal) => aturTanggalPelaksanaan(sb.judul, tanggal)}
                     />
                   )}
                 </div>
@@ -120,10 +136,12 @@ export default function PembelajaranDetailPage() {
   )
 }
 
-function SubBabDetail({ subBab, bab, kelas, muridList, pertemuan }) {
+function SubBabDetail({ subBab, bab, kelas, muridList, pertemuan, onAturTanggal }) {
   const [tab, setTab] = useState('kehadiran')
   const [rekapAbsen, setRekapAbsen] = useState(null)
   const [loadingAbsen, setLoadingAbsen] = useState(false)
+  const [tanggalInput, setTanggalInput] = useState(pertemuan?.tanggal || format(new Date(), 'yyyy-MM-dd'))
+  const [savingTanggal, setSavingTanggal] = useState(false)
 
   useEffect(() => {
     async function loadAbsen() {
@@ -138,13 +156,25 @@ function SubBabDetail({ subBab, bab, kelas, muridList, pertemuan }) {
     loadAbsen()
   }, [pertemuan, kelas])
 
+  async function simpanTanggal() {
+    setSavingTanggal(true)
+    await onAturTanggal(tanggalInput)
+    setSavingTanggal(false)
+  }
+
   return (
     <div className="mt-3 pt-3 border-t border-gray-100">
-      {!pertemuan && (
-        <div className="bg-orange-50 border border-orange-100 rounded-lg px-3 py-2 mb-3">
-          <p className="text-xs text-orange-700">Sub-bab ini belum dicatat sebagai pertemuan. Catat dulu di menu Bab & Laporan → Pertemuan & Refleksi supaya tanggalnya tersimpan.</p>
+      <div className="bg-navy-50 border border-navy-100 rounded-lg px-3 py-2.5 mb-3">
+        <p className="text-xs text-navy-700 font-semibold mb-1.5">Tanggal Pelaksanaan</p>
+        <div className="flex gap-2">
+          <input type="date" className="input text-sm flex-1" value={tanggalInput} onChange={e => setTanggalInput(e.target.value)} />
+          <button onClick={simpanTanggal} disabled={savingTanggal}
+            className="px-3 py-2 bg-navy-700 text-white text-xs font-semibold rounded-lg disabled:opacity-60">
+            {savingTanggal ? '...' : pertemuan ? 'Ubah' : 'Atur'}
+          </button>
         </div>
-      )}
+        {pertemuan && <p className="text-xs text-navy-500 mt-1">Tersimpan: {format(new Date(pertemuan.tanggal + 'T00:00:00'), 'EEEE, d MMMM yyyy', { locale: localeId })}</p>}
+      </div>
 
       <div className="flex gap-1 overflow-x-auto pb-2 mb-3">
         {[['kehadiran','Kehadiran', ClipboardList],['formatif','Formatif', BarChart2],['dpl','DPL', Heart],['pengayaan','Pengayaan/Remedial', Sprout]].map(([key, label, Icon]) => (
