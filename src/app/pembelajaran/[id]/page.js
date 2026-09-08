@@ -69,10 +69,17 @@ export default function PembelajaranDetailPage() {
 
   async function aturTanggalPelaksanaan(subBabJudul, tanggal) {
     const existing = pertemuanList.find(p => p.sub_bab_judul === subBabJudul)
+    let error
     if (existing) {
-      await supabase.from('pertemuan_bab').update({ tanggal }).eq('id', existing.id)
+      const res = await supabase.from('pertemuan_bab').update({ tanggal }).eq('id', existing.id)
+      error = res.error
     } else {
-      await supabase.from('pertemuan_bab').insert({ bab_id: babId, sub_bab_judul: subBabJudul, tanggal })
+      const res = await supabase.from('pertemuan_bab').insert({ bab_id: babId, sub_bab_judul: subBabJudul, tanggal })
+      error = res.error
+    }
+    if (error) {
+      alert('Gagal menyimpan tanggal: ' + error.message)
+      return
     }
     await reloadPertemuan()
   }
@@ -231,7 +238,10 @@ function FormatifQuick({ muridList, bab, pertemuan, subBab }) {
       mata_pelajaran: bab.mata_pelajaran, topik: subBab.judul,
       keaktifan: nilai[m.id].keaktifan || 3, fokus: nilai[m.id].fokus || 3, pemahaman: nilai[m.id].pemahaman || 3,
     }))
-    if (rows.length > 0) await supabase.from('penilaian_formatif').insert(rows)
+    if (rows.length > 0) {
+      const { error } = await supabase.from('penilaian_formatif').insert(rows)
+      if (error) { alert('Gagal menyimpan: ' + error.message); setSaving(false); return }
+    }
     setSaving(false); setSaved(true); setNilai({})
   }
 
@@ -297,10 +307,12 @@ function DplQuick({ muridList, bab, pertemuan, subBab }) {
     if (!pertemuan) { alert('Sub-bab ini belum punya tanggal pertemuan.'); return }
     if (!muridId || !catatan.trim()) { alert('Pilih murid dan isi catatan.'); return }
     setSaving(true)
-    await supabase.from('catatan_karakter').insert({
+    const { error } = await supabase.from('catatan_karakter').insert({
       murid_id: muridId, kelas_id: bab.kelas_id, tanggal: pertemuan.tanggal, kategori, catatan: catatan.trim()
     })
-    setSaving(false); setCatatan(''); setMuridId('')
+    setSaving(false)
+    if (error) { alert('Gagal menyimpan: ' + error.message); return }
+    setCatatan(''); setMuridId('')
     const { data } = await supabase.from('catatan_karakter').select('*, murid(nama)').eq('kelas_id', bab.kelas_id).eq('tanggal', pertemuan.tanggal)
     setDaftar(data || [])
   }
@@ -352,10 +364,12 @@ function PengayaanQuick({ muridList, bab, pertemuan, subBab }) {
     if (!pertemuan) { alert('Sub-bab ini belum punya tanggal pertemuan.'); return }
     if (!muridId) { alert('Pilih murid.'); return }
     setSaving(true)
-    await supabase.from('pengayaan_remedial').insert({
+    const { error } = await supabase.from('pengayaan_remedial').insert({
       murid_id: muridId, bab_id: bab.id, sub_bab_judul: subBab.judul, tanggal: pertemuan.tanggal, jenis, catatan: catatan.trim() || null
     })
-    setSaving(false); setCatatan(''); setMuridId('')
+    setSaving(false)
+    if (error) { alert('Gagal menyimpan: ' + error.message); return }
+    setCatatan(''); setMuridId('')
     const { data } = await supabase.from('pengayaan_remedial').select('*, murid(nama)').eq('bab_id', bab.id).eq('sub_bab_judul', subBab.judul)
     setDaftar(data || [])
   }
