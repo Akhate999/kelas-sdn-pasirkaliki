@@ -384,6 +384,74 @@ Gunakan bahasa Indonesia yang jelas dan praktis untuk guru SD. Semua konten haru
   }
 
   function cetakRpp(rpp) {
+    function inlineMd(s) {
+      return s
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/(^|[^*])\*(?!\*)(.+?)\*(?!\*)/g, '$1<em>$2</em>')
+    }
+    // Konversi markdown ringan (bold, heading, list, tabel) jadi HTML
+    // supaya tidak tampil sebagai simbol mentah (**, ###, |---|) saat dicetak.
+    function markdownKeHtml(teks) {
+      if (!teks) return ''
+      const text = String(teks)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+      const lines = text.split('\n')
+      let html = ''
+      let inList = false
+      let tableRows = []
+      let inTable = false
+
+      function closeList() { if (inList) { html += '</ul>'; inList = false } }
+      function closeTable() {
+        if (inTable) {
+          html += '<table class="tabel-rpp">'
+          tableRows.forEach((cells, i) => {
+            const tag = i === 0 ? 'th' : 'td'
+            html += '<tr>' + cells.map(c => `<${tag}>${inlineMd(c.trim())}</${tag}>`).join('') + '</tr>'
+          })
+          html += '</table>'
+          inTable = false
+          tableRows = []
+        }
+      }
+
+      for (const raw of lines) {
+        const line = raw.trim()
+
+        if (/^\|.*\|$/.test(line)) {
+          if (/^\|[\s:\-|]+\|$/.test(line)) continue // baris pemisah |---|---|
+          closeList()
+          tableRows.push(line.slice(1, -1).split('|'))
+          inTable = true
+          continue
+        }
+        closeTable()
+
+        if (line === '') { closeList(); continue }
+
+        const h3 = line.match(/^###\s+(.*)/)
+        const h2 = line.match(/^##\s+(.*)/)
+        const h1 = line.match(/^#\s+(.*)/)
+        if (h3) { closeList(); html += `<h4>${inlineMd(h3[1])}</h4>`; continue }
+        if (h2) { closeList(); html += `<h3>${inlineMd(h2[1])}</h3>`; continue }
+        if (h1) { closeList(); html += `<h2>${inlineMd(h1[1])}</h2>`; continue }
+
+        const li = line.match(/^[-*]\s+(.*)/)
+        if (li) {
+          if (!inList) { html += '<ul>'; inList = true }
+          html += `<li>${inlineMd(li[1])}</li>`
+          continue
+        }
+
+        closeList()
+        html += `<p>${inlineMd(line)}</p>`
+      }
+      closeList()
+      closeTable()
+      return html
+    }
     function halamanLampiran(judulLampiran, konten) {
       if (!adaIsi(konten)) return ''
       return `
@@ -392,7 +460,7 @@ Gunakan bahasa Indonesia yang jelas dan praktis untuk guru SD. Semua konten haru
           <img src="/logo-sdn.png"/>
           <div><div class="nama-kecil">SDN PASIRKALIKI I</div><div class="sub-kecil">${judulLampiran}</div></div>
         </div>
-        <div class="konten">${konten}</div>
+        <div class="konten">${markdownKeHtml(konten)}</div>
       `
     }
     const romawiTingkat = ROMAWI[rpp.tingkat] || rpp.tingkat
@@ -404,7 +472,16 @@ Gunakan bahasa Indonesia yang jelas dan praktis untuk guru SD. Semua konten haru
       .kop{display:flex;align-items:center;gap:16px;border-bottom:3px solid #163a61;padding-bottom:14px;margin-bottom:20px}
       .kop img{width:56px;height:56px}.kop .nama{font-size:16px;font-weight:bold;color:#163a61}
       h1{font-size:15px;color:#163a61;margin-bottom:4px}.sub{font-size:12px;color:#666;margin-bottom:20px}
-      .konten{font-size:13px;white-space:pre-wrap}
+      .konten{font-size:13px}
+      .konten p{margin:0 0 10px}
+      .konten h2{font-size:15px;color:#163a61;margin:16px 0 8px}
+      .konten h3{font-size:14px;color:#163a61;margin:14px 0 6px}
+      .konten h4{font-size:13px;color:#163a61;margin:12px 0 4px}
+      .konten ul{margin:0 0 10px;padding-left:20px}
+      .konten li{margin-bottom:4px}
+      .konten table.tabel-rpp{border-collapse:collapse;width:100%;margin:10px 0;font-size:12px}
+      .konten table.tabel-rpp th,.konten table.tabel-rpp td{border:1px solid #ccc;padding:6px 8px;text-align:left}
+      .konten table.tabel-rpp th{background:#f0f4f8;font-weight:bold}
       .page-break{page-break-before:always}
       .kop-kecil{display:flex;align-items:center;gap:12px;border-bottom:2px solid #163a61;padding-bottom:10px;margin-bottom:16px}
       .kop-kecil img{width:44px;height:44px}
@@ -419,7 +496,7 @@ Gunakan bahasa Indonesia yang jelas dan praktis untuk guru SD. Semua konten haru
     <div class="kop"><img src="/logo-sdn.png"/><div><div class="nama">SDN PASIRKALIKI I</div></div></div>
     <h1>MODUL AJAR / PERENCANAAN PEMBELAJARAN MENDALAM</h1>
     <p class="sub">${rpp.judul} · ${rpp.mata_pelajaran} · Kelas ${rpp.tingkat || '-'}</p>
-    <div class="konten">${rpp.konten_ai}</div>
+    <div class="konten">${markdownKeHtml(rpp.konten_ai)}</div>
     <div class="ttd">
       <div class="kolom">
         <p>Mengetahui,</p>
