@@ -6,7 +6,7 @@ import { useRouter, usePathname } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import {
   LayoutDashboard, ClipboardList, Heart, BarChart2,
-  Award, BookOpen, Users, Menu, X, LogOut, ChevronRight, BookMarked, FileText, ClipboardCheck, ListTree, ListChecks, GraduationCap
+  Award, BookOpen, Users, Menu, X, LogOut, ChevronRight, BookMarked, FileText, ClipboardCheck, ListTree, ListChecks, GraduationCap, TrendingUp
 } from 'lucide-react'
 
 const menuItems = [
@@ -16,6 +16,7 @@ const menuItems = [
   { href: '/aturan-kelas', label: 'Aturan Kelas',      icon: ListChecks },
   { href: '/formatif',   label: 'Penilaian Formatif',  icon: BarChart2 },
   { href: '/sumatif',    label: 'Penilaian Sumatif',   icon: Award },
+  { href: '/profil-kemampuan', label: 'Profil Kemampuan', icon: TrendingUp },
   { href: '/kerangka',   label: 'Kerangka Bab',        icon: ListTree },
   { href: '/rpp',        label: 'RPP',                 icon: ClipboardCheck },
   { href: '/bab',        label: 'Bab & Laporan',       icon: BookMarked },
